@@ -1,9 +1,12 @@
-# -*- coding: utf-8 -*-
+## -*- coding: utf-8 -*-
 
 import os
 import pickle
 import numpy as np
 from tag_utils import to2bio
+from transformers import AutoModel, AutoTokenizer
+import re
+import unidecode
 
 def load_word_vec(path, word2idx=None, embed_dim=300):
     fin = open(path, 'r', encoding='utf-8', newline='\n', errors='ignore')
@@ -70,6 +73,17 @@ class Tokenizer(object):
         if len(sequence) == 0:
             sequence = [0]
         return sequence
+    
+    def sequence_to_text(self, sequence):
+        reverse_word_map = dict(map(reversed, self.word2idx.items()))
+        
+        texts = []
+        for sent in sequence.tolist():
+            text = []
+            for key in sent:
+                text.append(reverse_word_map.get(key))
+            texts.append(text)    
+        return texts
 
 def build_tokenizer(data_dir):
     if os.path.exists(os.path.join(data_dir, 'word2idx.pkl')):
@@ -92,6 +106,61 @@ def build_tokenizer(data_dir):
             pickle.dump(tokenizer.word2idx, f)
 
     return tokenizer
+
+class BertTokenizerA(object):
+    def __init__(self, bert_model = 'bert-base-uncased'):
+        self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
+        self.contractions = {"'s": "is", "n't": "not", "'ve": "have",
+                "'re": "are", "'m": "am", "''": "'", "'d": "would", 
+                "'ll": "will", "'ino": "into", "N'T": "NOT", "'have": 'have', }
+
+    def text_to_sequence(self, text):
+        text = unidecode.unidecode(text)
+        text = re.sub("â€™", "'", text)
+
+        tokens_bert = self.bert_tokenizer.tokenize(text)
+        tokens_naive = text.lower().split()
+        
+        no_equals, compare_tokens = self.positions_from_wordPieceSplit_in_spaceSplit(tokens_bert, tokens_naive)
+
+        max_len = len(tokens_bert) if len(tokens_bert) < 513 else 512
+        sequence_bert = self.bert_tokenizer.encode(text, return_tensors='pt', add_special_tokens=False, max_length=max_len, padding='max_length', truncation=True)
+        sequence_naive = sequence_bert[0][np.array(compare_tokens)[:,0]]
+        
+        return sequence_naive.tolist(), sequence_bert[0].tolist(), compare_tokens
+    
+    def positions_from_wordPieceSplit_in_spaceSplit(self, bert_split, naive_split):
+      no_equals = 0
+    
+      compare_tokens = []
+      k = 0
+      l = 0
+      
+      while k < len(naive_split):
+        
+        if naive_split[k] == bert_split[l]:
+          compare_tokens.append([l, l])
+          k += 1
+          l += 1
+        else:
+    
+          for j in range(1, len(bert_split) - l + 1):
+            ngram = bert_split[l:l+j+1]
+            word = "".join(ngram)
+            word = word.replace("##", "")
+            if naive_split[k] == word:
+              compare_tokens.append([l, l+j])
+              k += 1
+              l = l + j + 1
+              break
+    
+      if len(naive_split) != len(compare_tokens) or len(bert_split) != np.max(compare_tokens) + 1:
+        print(naive_split)
+        print(bert_split)
+        no_equals += 1
+    
+      return no_equals, compare_tokens
+
 
 class ABSADataReader(object):
     def __init__(self, data_dir):
@@ -233,6 +302,71 @@ class ABSADataReaderV2(ABSADataReader):
                 'ap_spans': ap_spans,
                 'op_spans': op_spans,
                 'triplets': triplets,
+            }
+            all_data.append(data)
+        
+        return all_data
+        
+
+class ABSADataReaderV3(ABSADataReader):
+    def __init__(self, data_dir):
+        super(ABSADataReaderV3, self).__init__(data_dir)
+
+    def _create_dataset(self, set_type, tokenizer):
+        all_data = []
+
+        filename = os.path.join(self.data_dir, '%s_triplets.txt' % set_type)
+        fp = open(filename, 'r', encoding='utf-8')
+        lines = fp.readlines()
+        fp.close()
+
+        for i in range(len(lines)):
+            text, pairs = lines[i].strip().split('####')
+
+            text_indices, text_indices_bert, position_bert_in_naive = tokenizer.text_to_sequence(text)
+            seq_len = len(text_indices)
+            ap_tags = ['O'] * seq_len
+            op_tags = ['O'] * seq_len
+            ap_op_tags = ['O'] * seq_len
+
+            triplet_indices = np.zeros((seq_len, seq_len), dtype=np.int64)
+            ap_spans = []
+            op_spans = []
+            triplets = []
+            for pair in eval(pairs):
+                ap_beg, ap_end = pair[0][0], pair[0][-1]
+                op_beg, op_end = pair[1][0], pair[1][-1]
+                polarity_str = pair[2]
+                ap_tags[ap_beg:ap_end+1] = ['T'] * (ap_end-ap_beg+1)
+                op_tags[op_beg:op_end+1] = ['T'] * (op_end-op_beg+1)
+                ap_op_tags[ap_beg:ap_end+1] = ['T-AP'] * (ap_end-ap_beg+1)
+                ap_op_tags[op_beg:op_end+1] = ['T-OP'] * (op_end-op_beg+1)
+                polarity = self.polarity_map[polarity_str]
+                triplet_indices[ap_end, op_end] = polarity
+                if (ap_beg, ap_end) not in ap_spans:
+                    ap_spans.append((ap_beg, ap_end))
+                if (op_beg, op_end) not in op_spans:
+                    op_spans.append((op_beg, op_end))
+                triplets.append((ap_beg, ap_end, op_beg, op_end, polarity))
+
+            # convert from ot to bio
+            ap_tags = to2bio(ap_tags)
+            op_tags = to2bio(op_tags)
+            ap_op_tags = to2bio(ap_op_tags)
+
+            ap_indices = [self.tag_map[tag] for tag in ap_tags]
+            op_indices = [self.tag_map[tag] for tag in op_tags]
+
+            data = {
+                'text_indices': text_indices,
+                'ap_indices': ap_indices,
+                'op_indices': op_indices,
+                'triplet_indices': triplet_indices,
+                'ap_spans': ap_spans,
+                'op_spans': op_spans,
+                'triplets': triplets,
+                'text_indices_bert': text_indices_bert,
+                'position_bert_in_naive': position_bert_in_naive,
             }
             all_data.append(data)
         

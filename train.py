@@ -7,9 +7,10 @@ import random
 import torch
 import torch.nn as nn
 import numpy as np
-from bucket_iterator import BucketIterator
-from data_utils import ABSADataReader, ABSADataReaderV2, build_tokenizer, build_embedding_matrix
-from models import CMLA, HAST, OTE
+from bucket_iterator import BucketIterator, BucketIteratorBert
+from data_utils import ABSADataReader, ABSADataReaderV2, ABSADataReaderV3, BertTokenizerA, build_tokenizer, build_embedding_matrix
+from models import CMLA, HAST, OTE, BOTE
+
 
 class Instructor:
     def __init__(self, opt):
@@ -19,12 +20,22 @@ class Instructor:
             absa_data_reader = ABSADataReaderV2(data_dir=opt.data_dir)
         else:
             absa_data_reader = ABSADataReader(data_dir=opt.data_dir)
-        tokenizer = build_tokenizer(data_dir=opt.data_dir)
-        embedding_matrix = build_embedding_matrix(opt.data_dir, tokenizer.word2idx, opt.embed_dim, opt.dataset)
+        
+        if opt.model == 'bote':
+            absa_data_reader = ABSADataReaderV3(data_dir=opt.data_dir)
+            tokenizer = BertTokenizerA(opt.bert_model)
+            embedding_matrix = []
+            self.train_data_loader = BucketIteratorBert(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
+            self.dev_data_loader = BucketIteratorBert(data=absa_data_reader.get_dev(tokenizer), batch_size=opt.batch_size, shuffle=False)
+            self.test_data_loader = BucketIteratorBert(data=absa_data_reader.get_test(tokenizer), batch_size=opt.batch_size, shuffle=False)
+        else:
+            tokenizer = build_tokenizer(data_dir=opt.data_dir)
+            embedding_matrix = build_embedding_matrix(opt.data_dir, tokenizer.word2idx, opt.embed_dim, opt.dataset)
+            self.train_data_loader = BucketIterator(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
+            self.dev_data_loader = BucketIterator(data=absa_data_reader.get_dev(tokenizer), batch_size=opt.batch_size, shuffle=False)
+            self.test_data_loader = BucketIterator(data=absa_data_reader.get_test(tokenizer), batch_size=opt.batch_size, shuffle=False)
+            
         self.idx2tag, self.idx2polarity = absa_data_reader.reverse_tag_map, absa_data_reader.reverse_polarity_map
-        self.train_data_loader = BucketIterator(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
-        self.dev_data_loader = BucketIterator(data=absa_data_reader.get_dev(tokenizer), batch_size=opt.batch_size, shuffle=False)
-        self.test_data_loader = BucketIterator(data=absa_data_reader.get_test(tokenizer), batch_size=opt.batch_size, shuffle=False)
         self.model = opt.model_class(embedding_matrix, opt, self.idx2tag, self.idx2polarity).to(opt.device)
         self._print_args()
 
@@ -68,7 +79,6 @@ class Instructor:
                 # switch model to training mode, clear gradient accumulators
                 self.model.train()
                 optimizer.zero_grad()
-
                 inputs = [sample_batched[col].to(self.opt.device) for col in self.opt.input_cols]
                 targets = [sample_batched[col].to(self.opt.device) for col in self.opt.target_cols]
                 outputs = self.model(inputs)
@@ -148,7 +158,7 @@ class Instructor:
         f1 = 2 * precision * recall / (precision + recall + 1e-5)
         return [precision, recall, f1]
 
-    def run(self, repeats=10):
+    def run(self, repeats):
         if not os.path.exists('log/'):
             os.mkdir('log/')
 
@@ -223,27 +233,32 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--log_step', default=5, type=int)
     parser.add_argument('--patience', default=5, type=int)
-    parser.add_argument('--embed_dim', default=300, type=int)
-    parser.add_argument('--hidden_dim', default=300, type=int)
+    parser.add_argument('--embed_dim', default=768, type=int)
+    parser.add_argument('--hidden_dim', default=768, type=int)
     parser.add_argument('--polarities_dim', default=4, type=int)
     parser.add_argument('--seed', default=776, type=int)
     parser.add_argument('--device', default=None, type=str)
+    parser.add_argument('--repeats', default=2, type=int)
+    parser.add_argument('--bert_model', default='bert-base-uncased', type=str)
     opt = parser.parse_args()
 
     model_classes = {
         'cmla': CMLA,
         'hast': HAST,
         'ote': OTE,
+        'bote': BOTE
     }
     input_colses = {
         'cmla': ['text_indices', 'text_mask'],
         'hast': ['text_indices', 'text_mask'],
         'ote': ['text_indices', 'text_mask'],
+        'bote': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive'],
     }
     target_colses = {
         'cmla': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
         'hast': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
         'ote': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
+        'bote': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
     }
     initializers = {
         'xavier_uniform_': torch.nn.init.xavier_uniform_,
@@ -255,6 +270,10 @@ if __name__ == '__main__':
         'rest14': 'datasets/14rest',
         'rest15': 'datasets/15rest',
         'rest16': 'datasets/16rest',
+        'laptop14_bert': 'datasets_bert/14lap',
+        'rest14_bert': 'datasets_bert/14rest',
+        'rest15_bert': 'datasets_bert/15rest',
+        'rest16_bert': 'datasets_bert/16rest',
     }
     opt.model_class = model_classes[opt.model]
     opt.input_cols = input_colses[opt.model]
@@ -274,4 +293,4 @@ if __name__ == '__main__':
         torch.backends.cudnn.benchmark = False
 
     ins = Instructor(opt)
-    ins.run()
+    ins.run(opt.repeats)
