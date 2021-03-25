@@ -108,19 +108,22 @@ def build_tokenizer(data_dir):
     return tokenizer
 
 class BertTokenizerA(object):
-    def __init__(self, bert_model = 'bert-base-uncased'):
+    def __init__(self, bert_model = 'bert-base-uncased', case = 'uncased'):
         self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
+        self.case = case
         self.contractions = {"'s": "is", "n't": "not", "'ve": "have",
                 "'re": "are", "'m": "am", "''": "'", "'d": "would", 
                 "'ll": "will", "'ino": "into", "N'T": "NOT", "'have": 'have', }
 
     def text_to_sequence(self, text):
         text = unidecode.unidecode(text)
-        text = re.sub("â€™", "'", text)
+        text = re.sub("Ã¢â‚¬â„¢", "'", text)
+        text = re.sub("``", "\"", text)
 
         tokens_bert = self.bert_tokenizer.tokenize(text)
-        tokens_naive = text.lower().split()
         
+        tokens_naive = text.lower().split() if self.case == 'uncased' else text.split()
+
         no_equals, compare_tokens = self.positions_from_wordPieceSplit_in_spaceSplit(tokens_bert, tokens_naive)
 
         max_len = len(tokens_bert) if len(tokens_bert) < 513 else 512
@@ -196,7 +199,7 @@ class ABSADataReader(object):
         for i in range(0, len(lines), 2):
             text = lines[i].strip()
             pairs = lines[i+1].strip().split(';')
-
+            
             text_indices = tokenizer.text_to_sequence(text)
             seq_len = len(text_indices)
             ap_tags = ['O'] * seq_len

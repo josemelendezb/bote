@@ -23,7 +23,7 @@ class Instructor:
         
         if opt.model == 'bote':
             absa_data_reader = ABSADataReaderV3(data_dir=opt.data_dir)
-            tokenizer = BertTokenizerA(opt.bert_model)
+            tokenizer = BertTokenizerA(opt.bert_model, opt.case)
             embedding_matrix = []
             self.train_data_loader = BucketIteratorBert(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
             self.dev_data_loader = BucketIteratorBert(data=absa_data_reader.get_dev(tokenizer), batch_size=opt.batch_size, shuffle=False)
@@ -225,6 +225,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--v2', action='store_true')
     parser.add_argument('--model', default='ote', type=str)
+    parser.add_argument('--case', type=str)
     parser.add_argument('--dataset', default='laptop14', type=str, help='laptop14, rest14, rest15, rest16')
     parser.add_argument('--initializer', default='xavier_uniform_', type=str)
     parser.add_argument('--learning_rate', default=0.001, type=float)

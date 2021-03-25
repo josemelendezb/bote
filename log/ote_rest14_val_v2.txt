@@ -1,0 +1,8 @@
+repeat: 1
+test_ap_precision: 0.6249, test_ap_recall: 0.6639, test_ap_f1: 0.6438
+test_op_precision: 0.6798, test_op_recall: 0.6663, test_op_f1: 0.6730
+test_triplet_precision: 0.4134, test_triplet_recall: 0.3048, test_triplet_f1: 0.3509
+repeat: 2
+test_ap_precision: 0.6892, test_ap_recall: 0.5884, test_ap_f1: 0.6349
+test_op_precision: 0.7288, test_op_recall: 0.6452, test_op_f1: 0.6845
+test_triplet_precision: 0.4391, test_triplet_recall: 0.3300, test_triplet_f1: 0.3768
