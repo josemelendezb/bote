@@ -143,23 +143,20 @@ class BOTE(nn.Module):
     def forward(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive = inputs
         
-        bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert).last_hidden_state
+        bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[10]
         #bert_layer = self.bert(input_ids = text_indices, attention_mask = text_mask).last_hidden_state
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
 
         #x_reshaped = bert_layer.permute(0, 2, 1)
         #x_conv_list = F.relu(self.conv1d(x_reshaped))
         #bert_layer = x_conv_list.permute(0,2,1)
-        bert_layer1 = F.relu(self.reduc(bert_layer))
-        bert_layer1 = self.bert_dropout(bert_layer)
-        
-        bert_layer2 = F.relu(self.reduc(bert_layer))
-        bert_layer2 = self.bert_dropout(bert_layer)
-        
-        ap_rep = F.relu(self.ap_fc(bert_layer1))
-        op_rep = F.relu(self.op_fc(bert_layer1))
-        ap_node = F.relu(self.ap_fc(bert_layer2))
-        op_node = F.relu(self.op_fc(bert_layer2))
+        bert_layer = F.relu(self.reduc(bert_layer))
+        bert_layer = self.bert_dropout(bert_layer)
+
+        ap_rep = F.relu(self.ap_fc(bert_layer))
+        op_rep = F.relu(self.op_fc(bert_layer))
+        ap_node = F.relu(self.ap_fc(bert_layer))
+        op_node = F.relu(self.op_fc(bert_layer))
         
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
@@ -171,21 +168,19 @@ class BOTE(nn.Module):
     def inference(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive = inputs
         text_len = torch.sum(text_mask, dim=-1)
-        bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert).last_hidden_state
+        bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[10]
         #bert_layer = self.bert(input_ids = text_indices, attention_mask = text_mask).last_hidden_state
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
         
         #x_reshaped = bert_layer.permute(0, 2, 1)
         #x_conv_list = F.relu(self.conv1d(x_reshaped))
         #bert_layer = x_conv_list.permute(0,2,1)
-        bert_layer1 = F.relu(self.reduc(bert_layer))
-        
-        bert_layer2 = F.relu(self.reduc(bert_layer))
-        
-        ap_rep = F.relu(self.ap_fc(bert_layer1))
-        op_rep = F.relu(self.op_fc(bert_layer2))
-        ap_node = F.relu(self.ap_fc(bert_layer1))
-        op_node = F.relu(self.op_fc(bert_layer2))
+        bert_layer = F.relu(self.reduc(bert_layer))
+
+        ap_rep = F.relu(self.ap_fc(bert_layer))
+        op_rep = F.relu(self.op_fc(bert_layer))
+        ap_node = F.relu(self.ap_fc(bert_layer))
+        op_node = F.relu(self.op_fc(bert_layer))
         
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
