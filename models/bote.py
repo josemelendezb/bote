@@ -8,6 +8,7 @@ from transformers import AutoModel, AutoTokenizer
 from tag_utils import bio2bieos, bieos2span, find_span_with_end
 import math
 from layers.dynamic_rnn import DynamicRNN
+import spacy
 
 def xavier_asymmetric_uniform(tensor, gain = 1.):
 
@@ -76,10 +77,11 @@ class BOTE(nn.Module):
         self.triplet_biaffine = Biaffine(opt, 100, 100, opt.polarities_dim, bias=(True, False))
         self.ap_tag_fc = nn.Linear(100, self.tag_dim)
         self.op_tag_fc = nn.Linear(100, self.tag_dim)
-        self.embed_pos = []
+        self.embed_pos = nn.Embedding(19,50, padding_idx = 0)
         
         for param in self.bert.base_model.parameters():
             param.requires_grad = False
+        
 
     def calc_loss(self, outputs, targets):
         ap_out, op_out, triplet_out = outputs
@@ -155,7 +157,10 @@ class BOTE(nn.Module):
         
         
     def forward(self, inputs):
-        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive = inputs
+        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices = inputs
+        print(text_indices)
+        print(postag_indices)
+        print(jshkfhsfka)
         text_len = torch.sum(text_mask, dim=-1)
         
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]

@@ -7,6 +7,7 @@ from tag_utils import to2bio
 from transformers import AutoModel, AutoTokenizer
 import re
 import unidecode
+import spacy
 
 def load_word_vec(path, word2idx=None, embed_dim=300):
     fin = open(path, 'r', encoding='utf-8', newline='\n', errors='ignore')
@@ -115,6 +116,15 @@ class BertTokenizerA(object):
         self.contractions = {"'s": "is", "n't": "not", "'ve": "have",
                 "'re": "are", "'m": "am", "''": "'", "'d": "would", 
                 "'ll": "will", "'ino": "into", "N'T": "NOT", "'have": 'have', }
+        self.pos_tag = {
+            'pad': 0, 'ADJ': 1, 'ADP': 2, 'ADV': 3, 'AUX': 4,
+            'CONJ': 5, 'DET': 6, 'INTJ': 7, 'NOUN': 8
+            'NUM': 9, 'PART': 10, 'PRON': 11, 'PROPN': 12,
+            'PUNCT': 13, 'SCONJ': 14, 'SYM': 15, 'VERB': 16,
+            'CCONJ': 17,'X': 18,
+        }
+
+        self.nlp = spacy.load("en_core_web_sm")
 
     def text_to_sequence(self, text):
         text = unidecode.unidecode(text)
@@ -164,7 +174,16 @@ class BertTokenizerA(object):
         no_equals += 1
     
       return no_equals, compare_tokens
+    
+    def text_to_sequence_postags(self, text):
+        text = unidecode.unidecode(text)
+        text = re.sub("Ã¢â‚¬â„¢", "'", text)
+        text = re.sub("``", "\"", text)
+        if self.case == 'uncased': text = text.lower()
+        doc = nlp(text)
+        indexes_postags = [pos_tag[token.pos_] for token in doc]
 
+        return indexes_postags
 
 class ABSADataReader(object):
     def __init__(self, data_dir):
@@ -328,6 +347,7 @@ class ABSADataReaderV3(ABSADataReader):
             text, pairs = lines[i].strip().split('####')
 
             text_indices, text_indices_bert, position_bert_in_naive = tokenizer.text_to_sequence(text)
+            postag_indices = tokenizer.text_to_sequence_postags(text)
             seq_len = len(text_indices)
             ap_tags = ['O'] * seq_len
             op_tags = ['O'] * seq_len
@@ -371,6 +391,7 @@ class ABSADataReaderV3(ABSADataReader):
                 'triplets': triplets,
                 'text_indices_bert': text_indices_bert,
                 'position_bert_in_naive': position_bert_in_naive,
+                'postag_indices': postag_indices
             }
             all_data.append(data)
         

@@ -326,7 +326,7 @@ if __name__ == '__main__':
         'cmla': ['text_indices', 'text_mask'],
         'hast': ['text_indices', 'text_mask'],
         'ote': ['text_indices', 'text_mask'],
-        'bote': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive'],
+        'bote': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive'. 'postag_indices'],
     }
     target_colses = {
         'cmla': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
