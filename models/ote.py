@@ -80,7 +80,7 @@ class OTE(nn.Module):
         embed = self.embed(text_indices)
         embed = self.embed_dropout(embed)
 
-        out, (_, _) = self.lstm(embed, text_len)
+        out, (_, _) = self.lstm(embed, text_len.cpu())
         
         ap_rep = F.relu(self.ap_fc(out))
         op_rep = F.relu(self.op_fc(out))
@@ -98,7 +98,7 @@ class OTE(nn.Module):
         text_indices, text_mask = inputs
         text_len = torch.sum(text_mask, dim=-1)
         embed = self.embed(text_indices)
-        out, (_, _) = self.lstm(embed, text_len)
+        out, (_, _) = self.lstm(embed, text_len.cpu())
         ap_rep = F.relu(self.ap_fc(out))
         op_rep = F.relu(self.op_fc(out))
         ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)

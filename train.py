@@ -4,6 +4,7 @@ import os
 import math
 import argparse
 import random
+import json
 import torch
 import torch.nn as nn
 import numpy as np
@@ -37,7 +38,18 @@ class Instructor:
             
         self.idx2tag, self.idx2polarity = absa_data_reader.reverse_tag_map, absa_data_reader.reverse_polarity_map
         self.model = opt.model_class(embedding_matrix, opt, self.idx2tag, self.idx2polarity).to(opt.device)
+        self.history_metrics = {
+            'epoch': [], 'step' : [],
+            'train_ap_precision' : [], 'train_ap_recall' : [], 'train_ap_f1' : [],
+            'train_op_precision' : [], 'train_op_recall' : [], 'train_op_f1' : [],
+            'train_triplet_precision' : [], 'train_triplet_recall' : [], 'train_triplet_f1' : [],
+            'dev_ap_precision' : [], 'dev_ap_recall' : [], 'dev_ap_f1' : [],
+            'dev_op_precision' : [], 'dev_op_recall' : [], 'dev_op_f1' : [],
+            'dev_triplet_precision' : [], 'dev_triplet_recall' : [], 'dev_triplet_f1' : []
+        }
+
         self._print_args()
+        
 
         if torch.cuda.is_available():
             print('>>> cuda memory allocated:', torch.cuda.memory_allocated(device=opt.device.index))
@@ -63,12 +75,52 @@ class Instructor:
                 else:
                     stdv = 1. / math.sqrt(p.shape[0])
                     torch.nn.init.uniform_(p, a=-stdv, b=stdv)
+    
+    def _save_history(self, epoch, step):
+        train_ap_metrics, train_op_metrics, train_triplet_metrics = self._evaluate(self.train_data_loader)
+        train_ap_precision, train_ap_recall, train_ap_f1 = train_ap_metrics
+        train_op_precision, train_op_recall, train_op_f1 = train_op_metrics
+        train_triplet_precision, train_triplet_recall, train_triplet_f1 = train_triplet_metrics
+        
+        dev_ap_metrics, dev_op_metrics, dev_triplet_metrics = self._evaluate(self.dev_data_loader)
+        dev_ap_precision, dev_ap_recall, dev_ap_f1 = dev_ap_metrics
+        dev_op_precision, dev_op_recall, dev_op_f1 = dev_op_metrics
+        dev_triplet_precision, dev_triplet_recall, dev_triplet_f1 = dev_triplet_metrics
 
+        self.history_metrics['epoch'].append(epoch)
+        self.history_metrics['step'].append(step)
+
+        self.history_metrics['train_ap_precision'].append(train_ap_precision)
+        self.history_metrics['train_ap_recall'].append(train_ap_recall)
+        self.history_metrics['train_ap_f1'].append(train_ap_f1)
+
+        self.history_metrics['train_op_precision'].append(train_op_precision)
+        self.history_metrics['train_op_recall'].append(train_op_recall)
+        self.history_metrics['train_op_f1'].append(train_op_f1)
+        
+        self.history_metrics['train_triplet_precision'].append(train_triplet_precision)
+        self.history_metrics['train_triplet_recall'].append(train_triplet_recall)
+        self.history_metrics['train_triplet_f1'].append(train_triplet_f1)
+        
+        self.history_metrics['dev_ap_precision'].append(dev_ap_precision)
+        self.history_metrics['dev_ap_recall'].append(dev_ap_recall)
+        self.history_metrics['dev_ap_f1'].append(dev_ap_f1)
+        
+        self.history_metrics['dev_op_precision'].append(dev_op_precision)
+        self.history_metrics['dev_op_recall'].append(dev_op_recall)
+        self.history_metrics['dev_op_f1'].append(dev_op_f1)
+        
+        self.history_metrics['dev_triplet_precision'].append(dev_triplet_precision)
+        self.history_metrics['dev_triplet_recall'].append(dev_triplet_recall)
+        self.history_metrics['dev_triplet_f1'].append(dev_triplet_f1)
+        
     def _train(self, optimizer):
         max_dev_f1 = 0
         best_state_dict_path = ''
         global_step = 0
         continue_not_increase = 0
+        
+
         for epoch in range(self.opt.num_epoch):
             print('>' * 100)
             print('epoch: {0}'.format(epoch+1))
@@ -86,7 +138,16 @@ class Instructor:
                 loss.backward()
                 optimizer.step()
 
+                #if epoch == self.opt.num_epoch - 1:
+                #    torch.save(inputs, "tensor/inputs.pt")
+                #    torch.save(outputs, "tensor/outputs.pt")
+                #    torch.save(targets, "tensor/targets.pt")
+                
+                if self.opt.save_history_metrics:
+                    self._save_history(epoch, global_step)
+
                 if global_step % self.opt.log_step == 0:
+                    print(">>>>Dev Metrics<<<<")
                     dev_ap_metrics, dev_op_metrics, dev_triplet_metrics = self._evaluate(self.dev_data_loader)
                     dev_ap_precision, dev_ap_recall, dev_ap_f1 = dev_ap_metrics
                     dev_op_precision, dev_op_recall, dev_op_f1 = dev_op_metrics
@@ -94,6 +155,7 @@ class Instructor:
                     print('dev_ap_precision: {:.4f}, dev_ap_recall: {:.4f}, dev_ap_f1: {:.4f}'.format(dev_ap_precision, dev_ap_recall, dev_ap_f1))
                     print('dev_op_precision: {:.4f}, dev_op_recall: {:.4f}, dev_op_f1: {:.4f}'.format(dev_op_precision, dev_op_recall, dev_op_f1))
                     print('loss: {:.4f}, dev_triplet_precision: {:.4f}, dev_triplet_recall: {:.4f}, dev_triplet_f1: {:.4f}'.format(loss.item(), dev_triplet_precision, dev_triplet_recall, dev_triplet_f1))
+                    
                     if dev_triplet_f1 > max_dev_f1:
                         increase_flag = True
                         max_dev_f1 = dev_triplet_f1
@@ -185,6 +247,9 @@ class Instructor:
             self._reset_params()
             _params = filter(lambda p: p.requires_grad, self.model.parameters())
             optimizer = torch.optim.Adam(_params, lr=self.opt.learning_rate, weight_decay=self.opt.l2reg)
+            ##ojo
+            #self.model.triplet_biaffine.weights_init()
+            ##
             best_state_dict_path = self._train(optimizer)
             self.model.load_state_dict(torch.load(best_state_dict_path))
             test_ap_metrics, test_op_metrics, test_triplet_metrics = self._evaluate(self.test_data_loader)
@@ -219,6 +284,12 @@ class Instructor:
 
         f_out.close()
 
+        if self.opt.save_history_metrics:
+            with open('log/history_metrics.json', 'w') as fp:
+                json.dump(self.history_metrics, fp, indent=4)
+            
+
+
 
 if __name__ == '__main__':
     # Hyper Parameters
@@ -241,6 +312,8 @@ if __name__ == '__main__':
     parser.add_argument('--device', default=None, type=str)
     parser.add_argument('--repeats', default=2, type=int)
     parser.add_argument('--bert_model', default='bert-base-uncased', type=str)
+    parser.add_argument('--bert_layer_index', default=10, type=int)
+    parser.add_argument('--save_history_metrics', action='store_true')
     opt = parser.parse_args()
 
     model_classes = {

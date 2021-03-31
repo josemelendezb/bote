@@ -6,7 +6,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 from tag_utils import bio2bieos, bieos2span, find_span_with_end
+import math
+from layers.dynamic_rnn import DynamicRNN
 
+def xavier_asymmetric_uniform(tensor, gain = 1.):
+
+    fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(tensor)
+    std = gain * math.sqrt(2.0 / float(fan_in + fan_out))
+    a = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+
+    return nn.init._no_grad_uniform_(tensor, -a, a/3)
+    
 class Biaffine(nn.Module):
     def __init__(self, opt, in1_features, in2_features, out_features, bias=(True, True)):
         super(Biaffine, self).__init__()
@@ -20,7 +30,14 @@ class Biaffine(nn.Module):
         self.linear = nn.Linear(in_features=self.linear_input_size,
                                 out_features=self.linear_output_size,
                                 bias=False)
+        
 
+    def weights_init(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                with torch.no_grad():
+                    module.weight = xavier_asymmetric_uniform(module.weight)
+                    
     def forward(self, input1, input2):
         batch_size, len1, dim1 = input1.size()
         batch_size, len2, dim2 = input2.size()
@@ -48,21 +65,17 @@ class BOTE(nn.Module):
         self.idx2tag = idx2tag
         self.tag_dim = len(self.idx2tag)
         self.idx2polarity = idx2polarity
-        reduc_dim = 400
-        
-        #num_filters=256
+        reduc_dim = 300
         
         self.bert = AutoModel.from_pretrained(opt.bert_model)
         self.bert_dropout = nn.Dropout(0.5)
-        self.reduc = nn.Linear(opt.embed_dim, reduc_dim)
-        self.ap_fc = nn.Linear(reduc_dim, 100)
-        self.op_fc = nn.Linear(reduc_dim, 100)
+        #self.reduc = nn.Linear(opt.embed_dim, reduc_dim)
+        self.reduc = DynamicRNN(opt.embed_dim, reduc_dim, batch_first=True, bidirectional=True, rnn_type='LSTM')
+        self.ap_fc = nn.Linear(2*reduc_dim, 200)
+        self.op_fc = nn.Linear(2*reduc_dim, 200)
         self.triplet_biaffine = Biaffine(opt, 100, 100, opt.polarities_dim, bias=(True, False))
         self.ap_tag_fc = nn.Linear(100, self.tag_dim)
         self.op_tag_fc = nn.Linear(100, self.tag_dim)
-
-        #self.conv1d = nn.Conv1d(in_channels=opt.embed_dim, out_channels=num_filters, kernel_size=1)
-        
         
         for param in self.bert.base_model.parameters():
             param.requires_grad = False
@@ -142,21 +155,19 @@ class BOTE(nn.Module):
         
     def forward(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive = inputs
+        text_len = torch.sum(text_mask, dim=-1)
         
-        bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[10]
-        #bert_layer = self.bert(input_ids = text_indices, attention_mask = text_mask).last_hidden_state
+        bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
-
-        #x_reshaped = bert_layer.permute(0, 2, 1)
-        #x_conv_list = F.relu(self.conv1d(x_reshaped))
-        #bert_layer = x_conv_list.permute(0,2,1)
-        bert_layer = F.relu(self.reduc(bert_layer))
         bert_layer = self.bert_dropout(bert_layer)
-
-        ap_rep = F.relu(self.ap_fc(bert_layer))
-        op_rep = F.relu(self.op_fc(bert_layer))
-        ap_node = F.relu(self.ap_fc(bert_layer))
-        op_node = F.relu(self.op_fc(bert_layer))
+    
+        #reduc = F.relu(self.reduc(bert_layer))
+        reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
+        ap_rep = F.relu(self.ap_fc(reduc))
+        op_rep = F.relu(self.op_fc(reduc))
+        
+        ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
+        op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
         
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
@@ -168,19 +179,16 @@ class BOTE(nn.Module):
     def inference(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive = inputs
         text_len = torch.sum(text_mask, dim=-1)
-        bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[10]
-        #bert_layer = self.bert(input_ids = text_indices, attention_mask = text_mask).last_hidden_state
+        bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
+    
+        #reduc = F.relu(self.reduc(bert_layer))
+        reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
+        ap_rep = F.relu(self.ap_fc(reduc))
+        op_rep = F.relu(self.op_fc(reduc))
         
-        #x_reshaped = bert_layer.permute(0, 2, 1)
-        #x_conv_list = F.relu(self.conv1d(x_reshaped))
-        #bert_layer = x_conv_list.permute(0,2,1)
-        bert_layer = F.relu(self.reduc(bert_layer))
-
-        ap_rep = F.relu(self.ap_fc(bert_layer))
-        op_rep = F.relu(self.op_fc(bert_layer))
-        ap_node = F.relu(self.ap_fc(bert_layer))
-        op_node = F.relu(self.op_fc(bert_layer))
+        ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
+        op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
         
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)

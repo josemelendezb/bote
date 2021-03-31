@@ -1,2 +1,8 @@
 glove/*
 *.pkl
+install.sh
+install.sh.1
+cloudflared
+cloudflared-stable-linux-amd64.tgz
+cloudflared.log
+pruebas.py

@@ -11,6 +11,7 @@ import unidecode
 def load_word_vec(path, word2idx=None, embed_dim=300):
     fin = open(path, 'r', encoding='utf-8', newline='\n', errors='ignore')
     word_vec = {}
+    
     for line in fin:
         tokens = line.rstrip().split()
         word, vec = ' '.join(tokens[:-embed_dim]), tokens[-embed_dim:]
