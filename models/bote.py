@@ -70,12 +70,13 @@ class BOTE(nn.Module):
         self.bert = AutoModel.from_pretrained(opt.bert_model)
         self.bert_dropout = nn.Dropout(0.5)
         #self.reduc = nn.Linear(opt.embed_dim, reduc_dim)
-        self.reduc = DynamicRNN(opt.embed_dim, reduc_dim, batch_first=True, bidirectional=True, rnn_type='LSTM')
+        self.reduc = DynamicRNN(opt.embed_dim, reduc_dim, batch_first=True, bidirectional=True, rnn_type='GRU')
         self.ap_fc = nn.Linear(2*reduc_dim, 200)
         self.op_fc = nn.Linear(2*reduc_dim, 200)
         self.triplet_biaffine = Biaffine(opt, 100, 100, opt.polarities_dim, bias=(True, False))
         self.ap_tag_fc = nn.Linear(100, self.tag_dim)
         self.op_tag_fc = nn.Linear(100, self.tag_dim)
+        self.embed_pos = []
         
         for param in self.bert.base_model.parameters():
             param.requires_grad = False
