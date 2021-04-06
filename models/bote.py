@@ -8,8 +8,9 @@ from transformers import AutoModel, AutoTokenizer
 from tag_utils import bio2bieos, bieos2span, find_span_with_end
 import math
 from layers.dynamic_rnn import DynamicRNN
+from layers.graph_attention_layer import GraphAttentionLayer
 import spacy
-from torch_position_embedding import PositionEmbedding
+#from torch_position_embedding import PositionEmbedding
 
 def xavier_asymmetric_uniform(tensor, gain = 1.):
 
@@ -70,19 +71,28 @@ class BOTE(nn.Module):
         reduc_dim = 300
         
         self.bert = AutoModel.from_pretrained(opt.bert_model)
-        self.bert_dropout = nn.Dropout(0.5)
-        #self.reduc = nn.Linear(opt.embed_dim, reduc_dim)
+        self.bert_dropout = nn.Dropout(0.3)
+        self.gat1 = GraphAttentionLayer(opt.embed_dim, opt.embed_dim)
+        self.gat2 = GraphAttentionLayer(opt.embed_dim, opt.embed_dim)
+
+        self.gate_map = nn.Linear(opt.embed_dim * 2, opt.embed_dim)
         self.reduc = DynamicRNN(opt.embed_dim, reduc_dim, batch_first=True, bidirectional=True, rnn_type='GRU')
-        self.ap_fc = nn.Linear(2*reduc_dim+50, 200)
-        self.op_fc = nn.Linear(2*reduc_dim+50, 200)
+
+        self.ap_fc = nn.Linear(2*reduc_dim, 200)
+        self.op_fc = nn.Linear(2*reduc_dim, 200)
         self.triplet_biaffine = Biaffine(opt, 100, 100, opt.polarities_dim, bias=(True, False))
+
         self.ap_tag_fc = nn.Linear(100, self.tag_dim)
         self.op_tag_fc = nn.Linear(100, self.tag_dim)
-        self.embed_POS = nn.Embedding(522,50, padding_idx = 0)
-        self.embed_position = PositionEmbedding(num_embeddings=522, embedding_dim=50, mode=PositionEmbedding.MODE_ADD)
         
+
+        self.cont = 0
         for param in self.bert.base_model.parameters():
             param.requires_grad = False
+        
+        
+        #self.embed_POS = nn.Embedding(522,50, padding_idx = 0)
+        #self.embed_position = PositionEmbedding(num_embeddings=522, embedding_dim=50, mode=PositionEmbedding.MODE_ADD)
         
 
     def calc_loss(self, outputs, targets):
@@ -159,59 +169,81 @@ class BOTE(nn.Module):
         
         
     def forward(self, inputs):
-        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices = inputs
+        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, adj = inputs
         
         text_len = torch.sum(text_mask, dim=-1)
         
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
 
-        bert_layer = self.bert_dropout(bert_layer)
-    
-        #reduc = F.relu(self.reduc(bert_layer))
+        if self.cont < 1: print(bert_layer.shape)
+
+        drop_bert_layer = self.bert_dropout(bert_layer)
+
+        x = F.relu(self.gat1(drop_bert_layer, adj))
+        x2 = self.gat2(x, adj)
+
+        if self.cont < 1: print(x.shape)
+        if self.cont < 1: print(x2.shape)
+
+        concat = torch.cat((x2, bert_layer), dim=2)
+        if self.cont < 1: print(concat.shape)
+        gate = torch.sigmoid(self.gate_map(concat))
+        if self.cont < 1: print(gate.shape)
+        merged_outputs = gate * x2 + (1 - gate) * bert_layer
+        if self.cont < 1: print(merged_outputs.shape)
+
         reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
-        
-        embed_pos = self.embed_POS(postag_indices)
-        embed_position = self.embed_position(embed_pos)
-        reduc = torch.cat((embed_position, reduc), dim=2)
-        
+
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
+
+        if self.cont < 1: print(ap_rep.shape)
+        if self.cont < 1: print(op_rep.shape)
+
         
         ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
         op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
+
+        if self.cont < 1: print(ap_rep.shape)
+        if self.cont < 1: print(op_rep.shape)
+        if self.cont < 1: print(ap_node.shape)
+        if self.cont < 1: print(op_node.shape)
         
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
 
-        triplet_out = self.triplet_biaffine(ap_rep, op_rep)
+        triplet_out = self.triplet_biaffine(ap_node, op_node)
+
+        self.cont += 1
         
         return [ap_out, op_out, triplet_out]
 
     def inference(self, inputs):
-        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices = inputs
+        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, adj = inputs
         text_len = torch.sum(text_mask, dim=-1)
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
 
+        x = F.relu(self.gat1(bert_layer, adj))
+        x2 = self.gat2(x, adj)
         
-        #reduc = F.relu(self.reduc(bert_layer))
+        concat = torch.cat((x2, bert_layer), dim=2)
+        gate = torch.sigmoid(self.gate_map(concat))
+        merged_outputs = gate * x2 + (1 - gate) * bert_layer
+
         reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
-        
-        embed_pos = self.embed_POS(postag_indices)
-        embed_position = self.embed_position(embed_pos)
-        reduc = torch.cat((embed_position, reduc), dim=2)
-        
+
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
         
         ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
         op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
-        
+
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
 
-        triplet_out = self.triplet_biaffine(ap_rep, op_rep)
+        triplet_out = self.triplet_biaffine(ap_node, op_node)
         
         batch_size = text_len.size(0)
         ap_tags = [[] for _ in range(batch_size)]
