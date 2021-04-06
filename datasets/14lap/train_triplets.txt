@@ -696,7 +696,7 @@ Toshiba customer services will indirectly deal with your problems by constantly 
 Quality Display I was surprised with the performance and quality of this HP Laptop .####[([0, 1], [4], 'POS'), ([7], [4], 'POS'), ([9], [4], 'POS')]
 The battery life also does n't keep up with the claim but still I think macbook is much ahead from the rest of the pack .####[([1, 2], [4, 5], 'NEG'), ([1, 2], [17, 18], 'NEG')]
 The internet capabilities are also very strong and picks up signals very easily .####[([1, 2], [6], 'POS'), ([1, 2], [12], 'POS')]
-Its fast , has High definition quality in the videos .####[([4, 5, 6], [4], 'POS')]
+Its fast , has High definition quality in the videos .####[([5, 6], [4], 'POS')]
 Another Great thing is the Beast graphics .####[([5, 6], [1], 'POS')]
 The ease of set up was terrific .####[([3, 4], [1], 'POS'), ([3, 4], [6], 'POS')]
 Everything I have tried has worked and I never have to carry the wall charger cause the battery is so awesome .####[([17], [20], 'POS')]

@@ -75,7 +75,7 @@ class Instructor:
                 else:
                     stdv = 1. / math.sqrt(p.shape[0])
                     torch.nn.init.uniform_(p, a=-stdv, b=stdv)
-    
+                    
     def _save_history(self, epoch, step):
         train_ap_metrics, train_op_metrics, train_triplet_metrics = self._evaluate(self.train_data_loader)
         train_ap_precision, train_ap_recall, train_ap_f1 = train_ap_metrics
@@ -138,7 +138,7 @@ class Instructor:
                 loss.backward()
                 optimizer.step()
 
-                #if epoch == self.opt.num_epoch - 1:
+                #if epoch == self.opt.num_epoch - 1: #eliminar
                 #    torch.save(inputs, "tensor/inputs.pt")
                 #    torch.save(outputs, "tensor/outputs.pt")
                 #    torch.save(targets, "tensor/targets.pt")
@@ -176,7 +176,7 @@ class Instructor:
         self.model.eval()
         t_ap_spans_all, t_op_spans_all, t_triplets_all  = None, None, None
         t_ap_spans_pred_all, t_op_spans_pred_all, t_triplets_pred_all  = None, None, None
-
+        t_inputs_all = None #eliminar
         with torch.no_grad():
             for t_batch, t_sample_batched in enumerate(data_loader):
                 t_inputs = [t_sample_batched[col].to(self.opt.device) for col in self.opt.input_cols]
@@ -190,6 +190,7 @@ class Instructor:
                     t_ap_spans_pred_all = t_ap_spans_pred
                     t_op_spans_pred_all = t_op_spans_pred
                     t_triplets_pred_all = t_triplets_pred
+                    t_inputs_all = t_inputs #Eliminar
                 else:
                     t_ap_spans_all = t_ap_spans_all + t_ap_spans
                     t_op_spans_all = t_op_spans_all + t_op_spans
@@ -197,7 +198,17 @@ class Instructor:
                     t_ap_spans_pred_all = t_ap_spans_pred_all + t_ap_spans_pred
                     t_op_spans_pred_all = t_op_spans_pred_all + t_op_spans_pred
                     t_triplets_pred_all = t_triplets_pred_all + t_triplets_pred
+                    t_inputs_all = t_inputs_all + t_inputs #Eliminar
         
+        #eliminar
+        inputs = t_inputs_all
+        outputs = [t_ap_spans_pred_all, t_op_spans_pred_all, t_triplets_pred_all]
+        targets = [t_ap_spans_all, t_op_spans_all, t_triplets_all] 
+        torch.save(inputs, "tensor/test_inputs.pt")
+        torch.save(outputs, "tensor/test_outputs.pt")
+        torch.save(targets, "tensor/test_targets.pt")
+        ########
+                
         return self._metrics(t_ap_spans_all, t_ap_spans_pred_all), self._metrics(t_op_spans_all, t_op_spans_pred_all), self._metrics(t_triplets_all, t_triplets_pred_all)
         
     @staticmethod
@@ -244,11 +255,19 @@ class Instructor:
         for i in range(repeats):
             print('repeat: {0}'.format(i+1))
             f_out.write('repeat: {0}\n'.format(i+1))
+            
+            ##elimintar
+            #for param in self.model.bert.base_model.parameters():
+            #    param.requires_grad = False
+            ##
+            
             self._reset_params()
             _params = filter(lambda p: p.requires_grad, self.model.parameters())
             optimizer = torch.optim.Adam(_params, lr=self.opt.learning_rate, weight_decay=self.opt.l2reg)
-            ##ojo
+            ##elimintar
             #self.model.triplet_biaffine.weights_init()
+            #for param in self.model.bert.base_model.parameters():
+            #    param.requires_grad = True
             ##
             best_state_dict_path = self._train(optimizer)
             self.model.load_state_dict(torch.load(best_state_dict_path))
@@ -326,7 +345,7 @@ if __name__ == '__main__':
         'cmla': ['text_indices', 'text_mask'],
         'hast': ['text_indices', 'text_mask'],
         'ote': ['text_indices', 'text_mask'],
-        'bote': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive'. 'postag_indices'],
+        'bote': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices'],
     }
     target_colses = {
         'cmla': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],

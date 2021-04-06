@@ -8,6 +8,20 @@ from transformers import AutoModel, AutoTokenizer
 import re
 import unidecode
 import spacy
+from spacy.tokens import Doc
+import json
+
+# A white space tokenizer is created to replace spacy tokenizer
+# to make compatible text_indices token length with postag_indices token length
+class WhitespaceTokenizer(object):
+    def __init__(self, vocab):
+        self.vocab = vocab
+
+    def __call__(self, text):
+        words = text.split(' ')
+        # All tokens 'own' a subsequent space character in this tokenizer
+        spaces = [True] * len(words)
+        return Doc(self.vocab, words=words, spaces=spaces)
 
 def load_word_vec(path, word2idx=None, embed_dim=300):
     fin = open(path, 'r', encoding='utf-8', newline='\n', errors='ignore')
@@ -109,6 +123,7 @@ def build_tokenizer(data_dir):
 
     return tokenizer
 
+   
 class BertTokenizerA(object):
     def __init__(self, bert_model = 'bert-base-uncased', case = 'uncased'):
         self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
@@ -116,15 +131,31 @@ class BertTokenizerA(object):
         self.contractions = {"'s": "is", "n't": "not", "'ve": "have",
                 "'re": "are", "'m": "am", "''": "'", "'d": "would", 
                 "'ll": "will", "'ino": "into", "N'T": "NOT", "'have": 'have', }
-        self.pos_tag = {
-            'pad': 0, 'ADJ': 1, 'ADP': 2, 'ADV': 3, 'AUX': 4,
-            'CONJ': 5, 'DET': 6, 'INTJ': 7, 'NOUN': 8
-            'NUM': 9, 'PART': 10, 'PRON': 11, 'PROPN': 12,
-            'PUNCT': 13, 'SCONJ': 14, 'SYM': 15, 'VERB': 16,
-            'CCONJ': 17,'X': 18,
-        }
+        #self.pos_tag = {
+        #    'pad': 0, 'ADJ': 1, 'ADP': 2, 'ADV': 3, 'AUX': 4,
+        #    'CONJ': 5, 'DET': 6, 'INTJ': 7, 'NOUN': 8,
+        #    'NUM': 9, 'PART': 10, 'PRON': 11, 'PROPN': 12,
+        #    'PUNCT': 13, 'SCONJ': 14, 'SYM': 15, 'VERB': 16,
+        #    'CCONJ': 17,'X': 18,
+        #}
+
+        #self.d_pos = {'PUNCT': 43,'SYM': 44}
+
+        #self.d_tag = {
+        #    'PAD': 0, 'CC': 1, 'CD': 2, 'DT': 3, 'EX': 4, 'FW': 5, 'IN': 6, 'JJ': 7, 'JJR': 8, 
+        #    'JJS': 9, 'LS': 10, 'MD': 11, 'NN': 12, 'NNS': 13, 'NNP': 14, 'NNPS': 15, 'PDT': 16, 
+        #    'POS': 17, 'PRP': 18, 'PRP$': 19, 'RB': 20, 'RBR': 21, 'RBS': 22, 'RP': 23, 'SYM': 24, 
+        #    'TO': 25, 'UH': 26, 'VB': 27, 'VBD': 28, 'VBG': 29, 'VBN': 30, 'VBP': 31, 'VBZ': 32, 
+        #    'WDT': 33, 'WP': 34, 'WP$': 35, 'WRB': 36, 'HYPH': 37, '-RRB-': 38, '-LRB-': 39,
+        #    'NFP': 40, 'AFX': 41, 'XX': 42
+        #}
 
         self.nlp = spacy.load("en_core_web_sm")
+        self.nlp.tokenizer = WhitespaceTokenizer(self.nlp.vocab)
+
+        with open('dict_tags_parser_tagger.json', 'r') as fp:
+            self.dict_tags_parser_tagger = json.load(fp)
+
 
     def text_to_sequence(self, text):
         text = unidecode.unidecode(text)
@@ -180,8 +211,27 @@ class BertTokenizerA(object):
         text = re.sub("Ã¢â‚¬â„¢", "'", text)
         text = re.sub("``", "\"", text)
         if self.case == 'uncased': text = text.lower()
-        doc = nlp(text)
-        indexes_postags = [pos_tag[token.pos_] for token in doc]
+        doc = self.nlp(text)
+        #indexes_postags = [self.pos_tag[token.pos_] for token in doc]
+        
+        indexes_postags = []
+        #for token in doc:
+        #    if token.tag_ in self.d_tag:
+        #        indexes_postags.append(self.d_tag[token.tag_])
+        #    elif token.pos_ in self.d_pos:
+        #        indexes_postags.append(self.d_pos[token.pos_])
+        #    else:
+        #        raise Exception("tag not found")
+
+        for token in doc:
+            cat = token.tag_ + "__" + token.dep_
+            if cat in self.dict_tags_parser_tagger:
+                indexes_postags.append(self.dict_tags_parser_tagger[cat])
+            else:
+                print(cat)
+                indexes_postags.append(1)
+
+                #raise Exception("tag not found")
 
         return indexes_postags
 
@@ -391,7 +441,7 @@ class ABSADataReaderV3(ABSADataReader):
                 'triplets': triplets,
                 'text_indices_bert': text_indices_bert,
                 'position_bert_in_naive': position_bert_in_naive,
-                'postag_indices': postag_indices
+                'postag_indices': postag_indices,
             }
             all_data.append(data)
         

@@ -9,6 +9,7 @@ from tag_utils import bio2bieos, bieos2span, find_span_with_end
 import math
 from layers.dynamic_rnn import DynamicRNN
 import spacy
+from torch_position_embedding import PositionEmbedding
 
 def xavier_asymmetric_uniform(tensor, gain = 1.):
 
@@ -31,7 +32,6 @@ class Biaffine(nn.Module):
         self.linear = nn.Linear(in_features=self.linear_input_size,
                                 out_features=self.linear_output_size,
                                 bias=False)
-        
 
     def weights_init(self):
         for module in self.modules():
@@ -50,6 +50,7 @@ class Biaffine(nn.Module):
             ones = torch.ones(batch_size, len2, 1).to(self.opt.device)
             input2 = torch.cat((input2, ones), dim=2)
             dim2 += 1
+
         affine = self.linear(input1)
         affine = affine.view(batch_size, len1*self.out_features, dim2)
         input2 = torch.transpose(input2, 1, 2)
@@ -72,12 +73,13 @@ class BOTE(nn.Module):
         self.bert_dropout = nn.Dropout(0.5)
         #self.reduc = nn.Linear(opt.embed_dim, reduc_dim)
         self.reduc = DynamicRNN(opt.embed_dim, reduc_dim, batch_first=True, bidirectional=True, rnn_type='GRU')
-        self.ap_fc = nn.Linear(2*reduc_dim, 200)
-        self.op_fc = nn.Linear(2*reduc_dim, 200)
+        self.ap_fc = nn.Linear(2*reduc_dim+50, 200)
+        self.op_fc = nn.Linear(2*reduc_dim+50, 200)
         self.triplet_biaffine = Biaffine(opt, 100, 100, opt.polarities_dim, bias=(True, False))
         self.ap_tag_fc = nn.Linear(100, self.tag_dim)
         self.op_tag_fc = nn.Linear(100, self.tag_dim)
-        self.embed_pos = nn.Embedding(19,50, padding_idx = 0)
+        self.embed_POS = nn.Embedding(522,50, padding_idx = 0)
+        self.embed_position = PositionEmbedding(num_embeddings=522, embedding_dim=50, mode=PositionEmbedding.MODE_ADD)
         
         for param in self.bert.base_model.parameters():
             param.requires_grad = False
@@ -158,17 +160,21 @@ class BOTE(nn.Module):
         
     def forward(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices = inputs
-        print(text_indices)
-        print(postag_indices)
-        print(jshkfhsfka)
+        
         text_len = torch.sum(text_mask, dim=-1)
         
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
+
         bert_layer = self.bert_dropout(bert_layer)
     
         #reduc = F.relu(self.reduc(bert_layer))
         reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
+        
+        embed_pos = self.embed_POS(postag_indices)
+        embed_position = self.embed_position(embed_pos)
+        reduc = torch.cat((embed_position, reduc), dim=2)
+        
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
         
@@ -178,18 +184,24 @@ class BOTE(nn.Module):
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
 
-        triplet_out = self.triplet_biaffine(ap_node, op_node)
+        triplet_out = self.triplet_biaffine(ap_rep, op_rep)
         
         return [ap_out, op_out, triplet_out]
 
     def inference(self, inputs):
-        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive = inputs
+        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices = inputs
         text_len = torch.sum(text_mask, dim=-1)
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
-    
+
+        
         #reduc = F.relu(self.reduc(bert_layer))
         reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
+        
+        embed_pos = self.embed_POS(postag_indices)
+        embed_position = self.embed_position(embed_pos)
+        reduc = torch.cat((embed_position, reduc), dim=2)
+        
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
         
@@ -199,7 +211,7 @@ class BOTE(nn.Module):
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
 
-        triplet_out = self.triplet_biaffine(ap_node, op_node)
+        triplet_out = self.triplet_biaffine(ap_rep, op_rep)
         
         batch_size = text_len.size(0)
         ap_tags = [[] for _ in range(batch_size)]
