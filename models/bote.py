@@ -193,7 +193,7 @@ class BOTE(nn.Module):
         merged_outputs = gate * x2 + (1 - gate) * bert_layer
         if self.cont < 1: print(merged_outputs.shape)
 
-        reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
+        reduc, (_, _) = self.reduc(merged_outputs, text_len.cpu())
 
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
@@ -232,7 +232,7 @@ class BOTE(nn.Module):
         gate = torch.sigmoid(self.gate_map(concat))
         merged_outputs = gate * x2 + (1 - gate) * bert_layer
 
-        reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
+        reduc, (_, _) = self.reduc(merged_outputs, text_len.cpu())
 
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
