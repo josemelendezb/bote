@@ -71,6 +71,7 @@ class BOTE(nn.Module):
         reduc_dim = 300
         
         self.bert = AutoModel.from_pretrained(opt.bert_model)
+        self.position_embedding = self.bert.embeddings.position_embeddings.weight
         self.bert_dropout = nn.Dropout(0.3)
         self.gat1 = GraphAttentionLayer(opt.embed_dim, opt.embed_dim)
         self.gat2 = GraphAttentionLayer(opt.embed_dim, opt.embed_dim)
@@ -172,6 +173,7 @@ class BOTE(nn.Module):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, adj = inputs
         
         text_len = torch.sum(text_mask, dim=-1)
+        position = self.position_embedding[0:text_indices.shape[1]]
         
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
@@ -181,6 +183,7 @@ class BOTE(nn.Module):
         drop_bert_layer = self.bert_dropout(bert_layer)
 
         x = F.relu(self.gat1(drop_bert_layer, adj))
+        x = x + position
         x2 = self.gat2(x, adj)
 
         if self.cont < 1: print(x.shape)
@@ -222,10 +225,12 @@ class BOTE(nn.Module):
     def inference(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, adj = inputs
         text_len = torch.sum(text_mask, dim=-1)
+        position = self.position_embedding[0:text_indices.shape[1]]
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
 
         x = F.relu(self.gat1(bert_layer, adj))
+        x = x + position
         x2 = self.gat2(x, adj)
         
         concat = torch.cat((x2, bert_layer), dim=2)
