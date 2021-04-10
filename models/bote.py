@@ -10,7 +10,8 @@ import math
 from layers.dynamic_rnn import DynamicRNN
 from layers.graph_attention_layer import GraphAttentionLayer
 import spacy
-#from torch_position_embedding import PositionEmbedding
+from layers.graph_multihead_attention_layer import GAT
+import dgl
 
 def xavier_asymmetric_uniform(tensor, gain = 1.):
 
@@ -52,9 +53,9 @@ class Biaffine(nn.Module):
             input2 = torch.cat((input2, ones), dim=2)
             dim2 += 1
 
-        affine = self.linear(input1)
+        affine = self.linear(input2)
         affine = affine.view(batch_size, len1*self.out_features, dim2)
-        input2 = torch.transpose(input2, 1, 2)
+        input2 = torch.transpose(input1, 1, 2)
         biaffine = torch.bmm(affine, input2)
         biaffine = torch.transpose(biaffine, 1, 2)
         biaffine = biaffine.contiguous().view(batch_size, len2, len1, self.out_features)
@@ -74,14 +75,14 @@ class BOTE(nn.Module):
         self.position_embedding = self.bert.embeddings.position_embeddings.weight
         self.bert_dropout = nn.Dropout(0.3)
         self.gat1 = GraphAttentionLayer(opt.embed_dim, opt.embed_dim)
-        self.gat2 = GraphAttentionLayer(opt.embed_dim, opt.embed_dim)
+        self.gat2 = GAT(in_dim=opt.embed_dim, hidden_dim=opt.embed_dim, out_dim=opt.embed_dim, num_heads=1)
 
         self.gate_map = nn.Linear(opt.embed_dim * 2, opt.embed_dim)
         self.reduc = DynamicRNN(opt.embed_dim, reduc_dim, batch_first=True, bidirectional=True, rnn_type='GRU')
 
         self.ap_fc = nn.Linear(2*reduc_dim, 200)
         self.op_fc = nn.Linear(2*reduc_dim, 200)
-        self.triplet_biaffine = Biaffine(opt, 100, 100, opt.polarities_dim, bias=(True, False))
+        self.triplet_biaffine = Biaffine(opt, 103, 103, opt.polarities_dim, bias=(False, False))
 
         self.ap_tag_fc = nn.Linear(100, self.tag_dim)
         self.op_tag_fc = nn.Linear(100, self.tag_dim)
@@ -168,53 +169,64 @@ class BOTE(nn.Module):
             
             return bert_layer[0, -add_n_pads:]
         
-        
+    def generate_dgl_graph(self, batch_adj_matrix):
+
+        batch_graph = []
+        for adj_matrix in batch_adj_matrix:
+            u = torch.tensor([]).to(self.opt.device)
+            v = torch.tensor([]).to(self.opt.device)
+            for i, head in enumerate(adj_matrix):
+                for j, child in enumerate(head):
+                    if child == 1 or i == j:
+                        ui = torch.tensor([i]).to(self.opt.device)
+                        vj = torch.tensor([j]).to(self.opt.device)
+
+                        u = torch.cat((u, ui), dim = 0)
+                        v = torch.cat((v, vj), dim = 0)
+
+            u = u.int()
+            v = v.int()
+
+            g = dgl.graph((u, v)).to(self.opt.device)
+            batch_graph.append(g)
+
+        batch_graph = dgl.batch(batch_graph)
+        return batch_graph
+
     def forward(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, adj = inputs
-        
+        #graph = self.generate_dgl_graph(adj)
         text_len = torch.sum(text_mask, dim=-1)
-        position = self.position_embedding[0:text_indices.shape[1]]
+        #position = self.position_embedding[0:text_indices.shape[1]]
         
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
 
-        if self.cont < 1: print(bert_layer.shape)
-
         drop_bert_layer = self.bert_dropout(bert_layer)
-
-        x = F.relu(self.gat1(drop_bert_layer, adj))
-        x = x + position
-        x2 = self.gat2(x, adj)
-
-        if self.cont < 1: print(x.shape)
-        if self.cont < 1: print(x2.shape)
-
-        concat = torch.cat((x2, bert_layer), dim=2)
-        if self.cont < 1: print(concat.shape)
-        gate = torch.sigmoid(self.gate_map(concat))
-        if self.cont < 1: print(gate.shape)
-        merged_outputs = gate * x2 + (1 - gate) * bert_layer
-        if self.cont < 1: print(merged_outputs.shape)
-
-        reduc, (_, _) = self.reduc(merged_outputs, text_len.cpu())
+        #drop_bert_layer_2D =  drop_bert_layer.view(drop_bert_layer.shape[0]*drop_bert_layer.shape[1], drop_bert_layer.shape[2])
+        #x = self.gat2(drop_bert_layer_2D, graph)
+        #>>>x = F.relu(self.gat1(drop_bert_layer, adj))
+        #x = x + position
+                
+        #>>>x =  x.view(bert_layer.shape[0], bert_layer.shape[1], bert_layer.shape[2])
+        
+        #>>>concat = torch.cat((x, bert_layer), dim=2)
+        #>>>gate = torch.sigmoid(self.gate_map(concat))
+        #>>>merged_outputs = gate * x + (1 - gate) * bert_layer
+        
+        reduc, (_, _) = self.reduc(drop_bert_layer, text_len.cpu())
 
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
-
-        if self.cont < 1: print(ap_rep.shape)
-        if self.cont < 1: print(op_rep.shape)
-
         
         ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
         op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
-
-        if self.cont < 1: print(ap_rep.shape)
-        if self.cont < 1: print(op_rep.shape)
-        if self.cont < 1: print(ap_node.shape)
-        if self.cont < 1: print(op_node.shape)
         
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
+
+        ap_node = torch.cat((ap_out, ap_node), dim=2)
+        op_node = torch.cat((op_out, op_node), dim=2)
 
         triplet_out = self.triplet_biaffine(ap_node, op_node)
 
@@ -224,29 +236,25 @@ class BOTE(nn.Module):
 
     def inference(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, adj = inputs
+        #graph = self.generate_dgl_graph(adj)
         text_len = torch.sum(text_mask, dim=-1)
-        position = self.position_embedding[0:text_indices.shape[1]]
+        #position = self.position_embedding[0:text_indices.shape[1]]
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
 
-        x = F.relu(self.gat1(bert_layer, adj))
-        x = x + position
-        x2 = self.gat2(x, adj)
+        reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
         
-        concat = torch.cat((x2, bert_layer), dim=2)
-        gate = torch.sigmoid(self.gate_map(concat))
-        merged_outputs = gate * x2 + (1 - gate) * bert_layer
-
-        reduc, (_, _) = self.reduc(merged_outputs, text_len.cpu())
-
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
-        
+
         ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
         op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
 
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
+
+        ap_node = torch.cat((ap_out, ap_node), dim=2)
+        op_node = torch.cat((op_out, op_node), dim=2)
 
         triplet_out = self.triplet_biaffine(ap_node, op_node)
         

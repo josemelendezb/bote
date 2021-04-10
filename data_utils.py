@@ -376,7 +376,7 @@ class ABSADataReaderV3(ABSADataReader):
         lines = fp.readlines()
         fp.close()
 
-        fp = open(filename + '.graph', 'rb')
+        fp = open(filename + '_sent.graph', 'rb')
         idx2gragh = pickle.load(fp)
         fp.close()
 
