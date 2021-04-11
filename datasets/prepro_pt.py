@@ -96,9 +96,17 @@ def extract_num_aspects(ap_tokens):
 # Extraer los indiices de un aspecto
 def aspect_indices(aspect_code, ap_list):
   initial = ap_list.index(aspect_code)
-  for i in range(initial + 1, len(ap_list)):
-    if ap_list[i] != aspect_code:
-      return [initial, i-1]
+
+  if initial == len(ap_list) - 1:
+    return [initial, initial]
+  else:
+    for i in range(initial + 1, len(ap_list)):
+      if ap_list[i] != aspect_code:
+        break
+    
+    return [initial, i-1]
+  
+  
 
 # Extraer cuantos aspectos hay en la oracion
 def extract_num_opinions(op_tokens):
@@ -154,10 +162,12 @@ def get_triplets(sentences):
   for i in range(len(sentences["aspect"])):
     triplets = []
     aspects = extract_num_aspects(sentences["aspect"][i])
+
     opinions = extract_num_opinions(sentences["opinion"][i])
     
     for ap in aspects:
       ap_indices = aspect_indices(ap, sentences["aspect"][i])
+
       op_indices = [] ##
       numeral = ap[-2:]
       for op_code in opinions:       
@@ -185,32 +195,37 @@ def split_dataset(df, path, porcentagens = {"train": 0.65, "validation": 0.1, "t
 
   train_df, val_df, test_df = df.iloc[:n[0], :], df.iloc[n[0]:n[0] + n[1], :], df.iloc[n[0] + n[1]:, :]
 
-  train_df.to_csv(path + "train_reli.txt", sep = "|", header = False, index = False)
+  train_df.to_csv(path + "train_triplets.txt", sep = "|", header = False, index = False)
   val_df.to_csv(path + "dev_triplets.txt", sep = "|", header = False, index = False)
   test_df.to_csv(path + "test_triplets.txt", sep = "|", header = False, index = False)
+
+  #Estos tres archivos se guardan solo para mantener compatibilidad con la estructura original
+  train_df.to_csv(path + "train.txt", sep = "|", header = False, index = False)
+  val_df.to_csv(path + "dev.txt", sep = "|", header = False, index = False)
+  test_df.to_csv(path + "test.txt", sep = "|", header = False, index = False)
 
   print(f"O conjuntos foram gerados de acordo às seguintes proporções: {porcentagens} o numero de reviews por conjunto são {n[0]}, {n[1]} e {n[2]} respectivamente.")
 
 
-  if __name__ == '__main__':
+if __name__ == '__main__':
 
-    files = [
-            'ReLi-Amado.txt',
-            'ReLi-Meyer.txt',
-            'ReLi-Orwell.txt',
-            'ReLi-Reboucas.txt',
-            'ReLi-Salinger.txt',
-            'ReLi-Saramago.txt',
-            'ReLi-Sheldon.txt',
-    ]
+  files = [
+          'ReLi-Amado.txt',
+          'ReLi-Meyer.txt',
+          'ReLi-Orwell.txt',
+          'ReLi-Reboucas.txt',
+          'ReLi-Salinger.txt',
+          'ReLi-Saramago.txt',
+          'ReLi-Sheldon.txt',
+  ]
 
-    display_orphan_aspects = False
-    sent = {"+": "POS", "-": "NEG"}
-    content = []
-    total_sentences = 0
+  display_orphan_aspects = False
+  sent = {"+": "POS", "-": "NEG"}
+  content = []
+  total_sentences = 0
 
-    for fi in files:
-    fin = open('ReLi/reli_raw/'+fi, 'r', encoding='utf-8', newline='\n', errors='ignore')
+  for fi in files:
+    fin = open('datasets/ReLi/reli_raw/'+fi, 'r', encoding='utf-8', newline='\n', errors='ignore')
     lines = fin.readlines()
 
     validate_doc(lines)
@@ -231,12 +246,14 @@ def split_dataset(df, path, porcentagens = {"train": 0.65, "validation": 0.1, "t
 
     #Consolidad todos los archivos
     for word, pos, aspect, opinion, polarity, help, triplets in zip(sentences["word"], sentences["pos"], sentences["aspect"], sentences["opinion"], sentences["polarity"], sentences["help"], sentences["triplets"]):
-        content.append(" ".join(word) + "####" + str(triplets) + "####" + str(pos) + "####" + str(aspect) + "####" + str(opinion) + "####" + str(polarity) + "####" + str(help) + "####" + str(fi))
+        #content.append(" ".join(word) + "####" + str(triplets) + "####" + str(pos) + "####" + str(aspect) + "####" + str(opinion) + "####" + str(polarity) + "####" + str(help) + "####" + str(fi))
 
-    # Save File
-    data = pd.DataFrame(content)
-    split_dataset(data, path = 'ReLi/')
+        content.append(" ".join(word) + "####" + str(triplets))
 
-    data.to_csv(folder + 'datasets/ReLi/total_triplets.txt', sep = "|", header = False, index = False)
+  # Save File
+  data = pd.DataFrame(content)
+  split_dataset(data, path = 'datasets/ReLi/')
 
-    print("total sentences",total_sentences)
+  data.to_csv('datasets/ReLi/total_triplets.txt', sep = "|", header = False, index = False)
+
+  print("total sentences",total_sentences)

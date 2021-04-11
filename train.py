@@ -24,7 +24,7 @@ class Instructor:
         
         if opt.model == 'bote':
             absa_data_reader = ABSADataReaderV3(data_dir=opt.data_dir)
-            tokenizer = BertTokenizerA(opt.bert_model, opt.case)
+            tokenizer = BertTokenizerA(opt.bert_model, opt.case, opt.spacy_lang)
             embedding_matrix = []
             self.train_data_loader = BucketIteratorBert(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
             self.dev_data_loader = BucketIteratorBert(data=absa_data_reader.get_dev(tokenizer), batch_size=opt.batch_size, shuffle=False)
@@ -256,19 +256,22 @@ class Instructor:
             print('repeat: {0}'.format(i+1))
             f_out.write('repeat: {0}\n'.format(i+1))
             
-            ##elimintar
-            #for param in self.model.bert.base_model.parameters():
-            #    param.requires_grad = False
-            ##
+            #Keep weights values
+            if opt.update_bert:
+                for param in self.model.bert.base_model.parameters():
+                    param.requires_grad = False
             
             self._reset_params()
             _params = filter(lambda p: p.requires_grad, self.model.parameters())
             optimizer = torch.optim.Adam(_params, lr=self.opt.learning_rate, weight_decay=self.opt.l2reg)
             ##elimintar
             #self.model.triplet_biaffine.weights_init()
-            #for param in self.model.bert.base_model.parameters():
-            #    param.requires_grad = True
-            ##
+
+            # Allow bert update its weights during training
+            if opt.update_bert:
+                for param in self.model.bert.base_model.parameters():
+                    param.requires_grad = True
+
             best_state_dict_path = self._train(optimizer)
             self.model.load_state_dict(torch.load(best_state_dict_path))
             test_ap_metrics, test_op_metrics, test_triplet_metrics = self._evaluate(self.test_data_loader)
@@ -333,6 +336,7 @@ if __name__ == '__main__':
     parser.add_argument('--bert_model', default='bert-base-uncased', type=str)
     parser.add_argument('--bert_layer_index', default=10, type=int)
     parser.add_argument('--save_history_metrics', action='store_true')
+    parser.add_argument('--update_bert', action='store_true')
     parser.add_argument('--lang', default='en', type=str)
     opt = parser.parse_args()
 
@@ -379,7 +383,7 @@ if __name__ == '__main__':
 
     spacy_languages = {
         'en': 'en_core_web_md',
-        'pt': 'pt_core_news_md',
+        'pt': 'pt_core_news_sm',
         'es': 'es_core_news_md',
     }
 

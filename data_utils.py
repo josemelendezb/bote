@@ -24,9 +24,6 @@ class WhitespaceTokenizer(object):
         spaces = [True] * len(words)
         return Doc(self.vocab, words=words, spaces=spaces)
 
-nlp = spacy.load(opt.spacy_lang)
-nlp.tokenizer = WhitespaceTokenizer(nlp.vocab)
-
 def load_word_vec(path, word2idx=None, embed_dim=300):
     fin = open(path, 'r', encoding='utf-8', newline='\n', errors='ignore')
     word_vec = {}
@@ -129,9 +126,11 @@ def build_tokenizer(data_dir):
 
    
 class BertTokenizerA(object):
-    def __init__(self, bert_model = 'bert-base-uncased', case = 'uncased'):
+    def __init__(self, bert_model = 'bert-base-uncased', case = 'uncased', spacy_lang = "en_core_web_md"):
         self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
         self.case = case
+        self.nlp = spacy.load(spacy_lang)
+        self.nlp.tokenizer = WhitespaceTokenizer(self.nlp.vocab)
         self.contractions = {"'s": "is", "n't": "not", "'ve": "have",
                 "'re": "are", "'m": "am", "''": "'", "'d": "would", 
                 "'ll": "will", "'ino": "into", "N'T": "NOT", "'have": 'have', }
@@ -166,7 +165,7 @@ class BertTokenizerA(object):
       
       while k < len(naive_split):
         
-        if naive_split[k] == bert_split[l]:
+        if naive_split[k] == bert_split[l] or bert_split[l] == "[UNK]":
           compare_tokens.append([l, l])
           k += 1
           l += 1
@@ -194,7 +193,7 @@ class BertTokenizerA(object):
         text = re.sub("Ã¢â‚¬â„¢", "'", text)
         text = re.sub("``", "\"", text)
         if self.case == 'uncased': text = text.lower()
-        doc = nlp(text)
+        doc = self.nlp(text)
         #indexes_postags = [self.pos_tag[token.pos_] for token in doc]
         
         indexes_postags = []
@@ -376,7 +375,7 @@ class ABSADataReaderV3(ABSADataReader):
         lines = fp.readlines()
         fp.close()
 
-        fp = open(filename + '_sent.graph', 'rb')
+        fp = open(filename + '.graph', 'rb')
         idx2gragh = pickle.load(fp)
         fp.close()
 

@@ -17,7 +17,7 @@ class WhitespaceTokenizer(object):
         spaces = [True] * len(words)
         return Doc(self.vocab, words=words, spaces=spaces)
 
-nlp = spacy.load(opt.spacy_lang)
+nlp = spacy.load("en_core_web_md")
 nlp.tokenizer = WhitespaceTokenizer(nlp.vocab)
 
 def normalize(mx):
