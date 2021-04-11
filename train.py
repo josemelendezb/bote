@@ -372,10 +372,17 @@ if __name__ == '__main__':
         'rehol': 'datasets/ReHol'
     }
     glove_files = {
-        'en': 'glove.840B.300d.txt',
-        'pt': 'glove.840B.300d_pt.txt',
-        'es': 'glove.840B.300d_es.txt',
+        'en': 'glove.300d.txt',
+        'pt': 'glove.300d_pt.txt',
+        'es': 'glove.300d_es.txt',
     }
+
+    spacy_languages = {
+        'en': 'en_core_web_md',
+        'pt': 'pt_core_news_md',
+        'es': 'es_core_news_md',
+    }
+
     opt.model_class = model_classes[opt.model]
     opt.input_cols = input_colses[opt.model]
     opt.target_cols = target_colses[opt.model]
@@ -383,6 +390,8 @@ if __name__ == '__main__':
     opt.initializer = initializers[opt.initializer]
     opt.data_dir = data_dirs[opt.dataset]
     opt.glove_fname = glove_files[opt.lang]
+    opt.spacy_lang = spacy_languages[opt.lang]
+    
     opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') \
         if opt.device is None else torch.device(opt.device)
 
