@@ -31,7 +31,7 @@ class Instructor:
             self.test_data_loader = BucketIteratorBert(data=absa_data_reader.get_test(tokenizer), batch_size=opt.batch_size, shuffle=False)
         else:
             tokenizer = build_tokenizer(data_dir=opt.data_dir)
-            embedding_matrix = build_embedding_matrix(opt.data_dir, tokenizer.word2idx, opt.embed_dim, opt.dataset)
+            embedding_matrix = build_embedding_matrix(opt.data_dir, tokenizer.word2idx, opt.embed_dim, opt.dataset, opt.glove_fname)
             self.train_data_loader = BucketIterator(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
             self.dev_data_loader = BucketIterator(data=absa_data_reader.get_dev(tokenizer), batch_size=opt.batch_size, shuffle=False)
             self.test_data_loader = BucketIterator(data=absa_data_reader.get_test(tokenizer), batch_size=opt.batch_size, shuffle=False)
@@ -333,6 +333,7 @@ if __name__ == '__main__':
     parser.add_argument('--bert_model', default='bert-base-uncased', type=str)
     parser.add_argument('--bert_layer_index', default=10, type=int)
     parser.add_argument('--save_history_metrics', action='store_true')
+    parser.add_argument('--lang', default='en', type=str)
     opt = parser.parse_args()
 
     model_classes = {
@@ -367,6 +368,13 @@ if __name__ == '__main__':
         'rest14_bert': 'datasets_bert/14rest',
         'rest15_bert': 'datasets_bert/15rest',
         'rest16_bert': 'datasets_bert/16rest',
+        'reli': 'datasets/ReLi',
+        'rehol': 'datasets/ReHol'
+    }
+    glove_files = {
+        'en': 'glove.840B.300d.txt',
+        'pt': 'glove.840B.300d_pt.txt',
+        'es': 'glove.840B.300d_es.txt',
     }
     opt.model_class = model_classes[opt.model]
     opt.input_cols = input_colses[opt.model]
@@ -374,6 +382,7 @@ if __name__ == '__main__':
     opt.eval_cols = ['ap_spans', 'op_spans', 'triplets']
     opt.initializer = initializers[opt.initializer]
     opt.data_dir = data_dirs[opt.dataset]
+    opt.glove_fname = glove_files[opt.lang]
     opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') \
         if opt.device is None else torch.device(opt.device)
 
