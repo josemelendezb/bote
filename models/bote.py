@@ -53,9 +53,9 @@ class Biaffine(nn.Module):
             input2 = torch.cat((input2, ones), dim=2)
             dim2 += 1
 
-        affine = self.linear(input2)
+        affine = self.linear(input1)
         affine = affine.view(batch_size, len1*self.out_features, dim2)
-        input2 = torch.transpose(input1, 1, 2)
+        input2 = torch.transpose(input2, 1, 2)
         biaffine = torch.bmm(affine, input2)
         biaffine = torch.transpose(biaffine, 1, 2)
         biaffine = biaffine.contiguous().view(batch_size, len2, len1, self.out_features)
@@ -82,7 +82,7 @@ class BOTE(nn.Module):
 
         self.ap_fc = nn.Linear(2*reduc_dim, 200)
         self.op_fc = nn.Linear(2*reduc_dim, 200)
-        self.triplet_biaffine = Biaffine(opt, 103, 103, opt.polarities_dim, bias=(False, False))
+        self.triplet_biaffine = Biaffine(opt, 100, 100, opt.polarities_dim, bias=(True, False))
 
         self.ap_tag_fc = nn.Linear(100, self.tag_dim)
         self.op_tag_fc = nn.Linear(100, self.tag_dim)
@@ -225,9 +225,6 @@ class BOTE(nn.Module):
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
 
-        ap_node = torch.cat((ap_out, ap_node), dim=2)
-        op_node = torch.cat((op_out, op_node), dim=2)
-
         triplet_out = self.triplet_biaffine(ap_node, op_node)
 
         self.cont += 1
@@ -252,9 +249,6 @@ class BOTE(nn.Module):
 
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
-
-        ap_node = torch.cat((ap_out, ap_node), dim=2)
-        op_node = torch.cat((op_out, op_node), dim=2)
 
         triplet_out = self.triplet_biaffine(ap_node, op_node)
         

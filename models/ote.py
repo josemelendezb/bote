@@ -21,6 +21,9 @@ class Biaffine(nn.Module):
         self.linear = nn.Linear(in_features=self.linear_input_size,
                                 out_features=self.linear_output_size,
                                 bias=False)
+        self.linear2 = nn.Linear(in_features=in2_features + int(bias[1]),
+                                out_features=in2_features + int(bias[1]),
+                                bias=False)
 
     def forward(self, input1, input2):
         batch_size, len1, dim1 = input1.size()
@@ -33,10 +36,15 @@ class Biaffine(nn.Module):
             ones = torch.ones(batch_size, len2, 1).to(self.opt.device)
             input2 = torch.cat((input2, ones), dim=2)
             dim2 += 1
+        #print("input1",input1.shape)
         affine = self.linear(input1)
+        #print("affine",affine.shape)
         affine = affine.view(batch_size, len1*self.out_features, dim2)
+        #print("affine reshape",affine.shape)
         input2 = torch.transpose(input2, 1, 2)
+        #print("input2",input2.shape)
         biaffine = torch.bmm(affine, input2)
+        #print("biaffine",biaffine.shape)
         biaffine = torch.transpose(biaffine, 1, 2)
         biaffine = biaffine.contiguous().view(batch_size, len2, len1, self.out_features)
 
@@ -124,11 +132,14 @@ class OTE(nn.Module):
         op_spans = self.opinion_decode(text_indices, op_tags, self.idx2tag)
         mat_mask = (text_mask.unsqueeze(2)*text_mask.unsqueeze(1)).unsqueeze(3).expand(
                               -1, -1, -1, self.opt.polarities_dim)  # batch x seq x seq x polarity
+        
         triplet_indices = torch.zeros_like(triplet_out).to(self.opt.device)
         triplet_indices = triplet_indices.scatter_(3, triplet_out.argmax(dim=3, keepdim=True), 1) * mat_mask.float()
+
         triplet_indices = torch.nonzero(triplet_indices).cpu().numpy().tolist()
-        triplets = self.sentiment_decode(text_indices, ap_tags, op_tags, triplet_indices, self.idx2tag, self.idx2polarity)
         
+        triplets = self.sentiment_decode(text_indices, ap_tags, op_tags, triplet_indices, self.idx2tag, self.idx2polarity)
+
         return [ap_spans, op_spans, triplets]
 
     @staticmethod

@@ -1,8 +1,4 @@
 repeat: 1
-test_ap_precision: 0.6585, test_ap_recall: 0.6527, test_ap_f1: 0.6556
-test_op_precision: 0.6380, test_op_recall: 0.6863, test_op_f1: 0.6613
-test_triplet_precision: 0.5112, test_triplet_recall: 0.4008, test_triplet_f1: 0.4493
-repeat: 2
-test_ap_precision: 0.6736, test_ap_recall: 0.5752, test_ap_f1: 0.6205
-test_op_precision: 0.6778, test_op_recall: 0.6821, test_op_f1: 0.6800
-test_triplet_precision: 0.5926, test_triplet_recall: 0.3424, test_triplet_f1: 0.4340
+test_ap_precision: 0.6336, test_ap_recall: 0.6350, test_ap_f1: 0.6342
+test_op_precision: 0.6802, test_op_recall: 0.6716, test_op_f1: 0.6758
+test_triplet_precision: 0.5160, test_triplet_recall: 0.3774, test_triplet_f1: 0.4360
