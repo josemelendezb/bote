@@ -194,7 +194,9 @@ class BOTE(nn.Module):
         return batch_graph
 
     def forward(self, inputs):
-        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, adj = inputs
+        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices, adj = inputs
+        print(postag_indices)
+        print(dlflf)
         #graph = self.generate_dgl_graph(adj)
         text_len = torch.sum(text_mask, dim=-1)
         #position = self.position_embedding[0:text_indices.shape[1]]

@@ -194,23 +194,14 @@ class BertTokenizerA(object):
         text = re.sub("``", "\"", text)
         if self.case == 'uncased': text = text.lower()
         doc = self.nlp(text)
-        #indexes_postags = [self.pos_tag[token.pos_] for token in doc]
         
         indexes_postags = []
-        #for token in doc:
-        #    if token.tag_ in self.d_tag:
-        #        indexes_postags.append(self.d_tag[token.tag_])
-        #    elif token.pos_ in self.d_pos:
-        #        indexes_postags.append(self.d_pos[token.pos_])
-        #    else:
-        #        raise Exception("tag not found")
 
         for token in doc:
-            cat = token.tag_ + "__" + token.dep_
-            if cat in self.dict_tags_parser_tagger:
-                indexes_postags.append(self.dict_tags_parser_tagger[cat])
+            if token.tag_ in self.dict_tags_parser_tagger:
+                indexes_postags.append(self.dict_tags_parser_tagger[token.tag_])
             else:
-                print(cat)
+                print(token.tag_)
                 indexes_postags.append(1)
 
                 #raise Exception("tag not found")
@@ -383,7 +374,7 @@ class ABSADataReaderV3(ABSADataReader):
             text, pairs = lines[i].strip().split('####')
 
             text_indices, text_indices_bert, position_bert_in_naive = tokenizer.text_to_sequence(text)
-            #postag_indices = tokenizer.text_to_sequence_postags(text)
+            postag_indices = tokenizer.text_to_sequence_postags(text)
             seq_len = len(text_indices)
             ap_tags = ['O'] * seq_len
             op_tags = ['O'] * seq_len
@@ -430,7 +421,7 @@ class ABSADataReaderV3(ABSADataReader):
                 'triplets': triplets,
                 'text_indices_bert': text_indices_bert,
                 'position_bert_in_naive': position_bert_in_naive,
-                #'postag_indices': postag_indices,
+                'postag_indices': postag_indices,
                 'dependency_graph': dependency_graph,
             }
             all_data.append(data)
