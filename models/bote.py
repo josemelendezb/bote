@@ -78,22 +78,24 @@ class BOTE(nn.Module):
         self.gat2 = GAT(in_dim=opt.embed_dim, hidden_dim=opt.embed_dim, out_dim=opt.embed_dim, num_heads=1)
 
         self.gate_map = nn.Linear(opt.embed_dim * 2, opt.embed_dim)
-        self.reduc = DynamicRNN(opt.embed_dim, reduc_dim, batch_first=True, bidirectional=True, rnn_type='GRU')
+        self.reduc = DynamicRNN(opt.embed_dim+50, reduc_dim, batch_first=True, bidirectional=True, rnn_type='GRU')
 
-        self.ap_fc = nn.Linear(2*reduc_dim, 200)
-        self.op_fc = nn.Linear(2*reduc_dim, 200)
-        self.triplet_biaffine = Biaffine(opt, 100, 100, opt.polarities_dim, bias=(True, False))
+        self.ap_fc = nn.Linear(2*reduc_dim, 150)
+        self.op_fc = nn.Linear(2*reduc_dim, 150)
+        self.ap_fc2 = nn.Linear(2*reduc_dim, 150)
+        self.op_fc2 = nn.Linear(2*reduc_dim, 150)
 
-        self.ap_tag_fc = nn.Linear(100, self.tag_dim)
-        self.op_tag_fc = nn.Linear(100, self.tag_dim)
-        
+        self.triplet_biaffine = Biaffine(opt, 150, 150, opt.polarities_dim, bias=(True, False))
+
+        self.ap_tag_fc = nn.Linear(150, self.tag_dim)
+        self.op_tag_fc = nn.Linear(150, self.tag_dim)
 
         self.cont = 0
         for param in self.bert.base_model.parameters():
             param.requires_grad = False
         
         
-        #self.embed_POS = nn.Embedding(522,50, padding_idx = 0)
+        self.embed_POS = nn.Embedding(4962,50, padding_idx = 0)
         #self.embed_position = PositionEmbedding(num_embeddings=522, embedding_dim=50, mode=PositionEmbedding.MODE_ADD)
         
 
@@ -195,14 +197,15 @@ class BOTE(nn.Module):
 
     def forward(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices, adj = inputs
-        print(postag_indices)
-        print(dlflf)
         #graph = self.generate_dgl_graph(adj)
         text_len = torch.sum(text_mask, dim=-1)
         #position = self.position_embedding[0:text_indices.shape[1]]
         
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
+
+        embed = self.embed_POS(postag_indices)
+        bert_layer = torch.cat((embed, bert_layer), dim=2)
 
         drop_bert_layer = self.bert_dropout(bert_layer)
         #drop_bert_layer_2D =  drop_bert_layer.view(drop_bert_layer.shape[0]*drop_bert_layer.shape[1], drop_bert_layer.shape[2])
@@ -215,14 +218,16 @@ class BOTE(nn.Module):
         #>>>concat = torch.cat((x, bert_layer), dim=2)
         #>>>gate = torch.sigmoid(self.gate_map(concat))
         #>>>merged_outputs = gate * x + (1 - gate) * bert_layer
-        
+
         reduc, (_, _) = self.reduc(drop_bert_layer, text_len.cpu())
 
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
-        
-        ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
-        op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
+        ap_node = F.relu(self.ap_fc2(reduc))
+        op_node = F.relu(self.op_fc2(reduc))
+
+        #ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
+        #op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
         
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
@@ -234,20 +239,25 @@ class BOTE(nn.Module):
         return [ap_out, op_out, triplet_out]
 
     def inference(self, inputs):
-        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, adj = inputs
+        text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices, adj = inputs
         #graph = self.generate_dgl_graph(adj)
         text_len = torch.sum(text_mask, dim=-1)
         #position = self.position_embedding[0:text_indices.shape[1]]
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
 
+        embed = self.embed_POS(postag_indices)
+        bert_layer = torch.cat((embed, bert_layer), dim=2)
+
         reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
-        
+
         ap_rep = F.relu(self.ap_fc(reduc))
         op_rep = F.relu(self.op_fc(reduc))
+        ap_node = F.relu(self.ap_fc2(reduc))
+        op_node = F.relu(self.op_fc2(reduc))
 
-        ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
-        op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
+        #ap_node, ap_rep = torch.chunk(ap_rep, 2, dim=2)
+        #op_node, op_rep = torch.chunk(op_rep, 2, dim=2)
 
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)

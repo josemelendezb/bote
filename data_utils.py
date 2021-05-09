@@ -205,7 +205,6 @@ class BertTokenizerA(object):
                 indexes_postags.append(1)
 
                 #raise Exception("tag not found")
-
         return indexes_postags
 
 class ABSADataReader(object):
