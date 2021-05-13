@@ -178,7 +178,11 @@ def get_triplets(sentences):
       # Armar los triplets
       for ind_op in op_indices:
         sign = sentences["opinion"][i][ind_op[0]][-1]
-        triplets.append((ap_indices, ind_op, sent[sign]))
+        
+        aspect_range = list(range(ap_indices[0], ap_indices[-1]+1))
+        opinion_range = list(range(ind_op[0], ind_op[-1]+1))
+        triplets.append((aspect_range, opinion_range, sent[sign]))
+        #triplets.append((ap_indices, ind_op, sent[sign]))
     
     triplets_all.append(triplets)
   

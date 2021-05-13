@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import json
 from transformers import AutoModel, AutoTokenizer
 from tag_utils import bio2bieos, bieos2span, find_span_with_end
 import math
@@ -95,7 +96,11 @@ class BOTE(nn.Module):
             param.requires_grad = False
         
         
-        self.embed_POS = nn.Embedding(4962,50, padding_idx = 0)
+        with open('dict_tags_parser_tagger_'+self.opt.lang+'.json', 'r') as fp:
+            self.dict_tags_parser_tagger = json.load(fp)
+        
+
+        self.embed_POS = nn.Embedding(len(self.dict_tags_parser_tagger),50, padding_idx = 0)
         #self.embed_position = PositionEmbedding(num_embeddings=522, embedding_dim=50, mode=PositionEmbedding.MODE_ADD)
         
 

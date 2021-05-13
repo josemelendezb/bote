@@ -1,12 +1,4 @@
 repeat: 1
-test_ap_precision: 0.6667, test_ap_recall: 0.7264, test_ap_f1: 0.6953
-test_op_precision: 0.4123, test_op_recall: 0.5385, test_op_f1: 0.4671
-test_triplet_precision: 0.4553, test_triplet_recall: 0.3104, test_triplet_f1: 0.3691
-repeat: 2
-test_ap_precision: 0.7164, test_ap_recall: 0.6714, test_ap_f1: 0.6932
-test_op_precision: 0.5258, test_op_recall: 0.4512, test_op_f1: 0.4857
-test_triplet_precision: 0.4792, test_triplet_recall: 0.2472, test_triplet_f1: 0.3261
-repeat: 3
-test_ap_precision: 0.7131, test_ap_recall: 0.6840, test_ap_f1: 0.6982
-test_op_precision: 0.3752, test_op_recall: 0.5488, test_op_f1: 0.4457
-test_triplet_precision: 0.4277, test_triplet_recall: 0.3341, test_triplet_f1: 0.3752
+test_ap_precision: 0.6957, test_ap_recall: 0.6651, test_ap_f1: 0.6801
+test_op_precision: 0.4510, test_op_recall: 0.4955, test_op_f1: 0.4722
+test_triplet_precision: 0.3904, test_triplet_recall: 0.3476, test_triplet_f1: 0.3678

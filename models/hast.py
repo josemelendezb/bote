@@ -129,6 +129,7 @@ class HAST(nn.Module):
     def forward(self, inputs):
         text_indices, text_mask = inputs
         text_len = torch.sum(text_mask, dim=-1)
+        text_len = text_len.cpu()
         batch_size, seq_len = text_indices.size()
         embed = self.embed(text_indices)
         embed = self.embed_dropout(embed)
@@ -159,6 +160,7 @@ class HAST(nn.Module):
     def inference(self, inputs):
         text_indices, text_mask = inputs
         text_len = torch.sum(text_mask, dim=-1)
+        text_len = text_len.cpu()
         batch_size, seq_len = text_indices.size()
         embed = self.embed(text_indices)
         H_ap, (_, _) = self.ap_lstm(embed, text_len) 

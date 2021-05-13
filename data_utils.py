@@ -126,7 +126,7 @@ def build_tokenizer(data_dir):
 
    
 class BertTokenizerA(object):
-    def __init__(self, bert_model = 'bert-base-uncased', case = 'uncased', spacy_lang = "en_core_web_md"):
+    def __init__(self, bert_model = 'bert-base-uncased', case = 'uncased', spacy_lang = "en_core_web_md", lang = "en"):
         self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
         self.case = case
         self.nlp = spacy.load(spacy_lang)
@@ -135,7 +135,7 @@ class BertTokenizerA(object):
                 "'re": "are", "'m": "am", "''": "'", "'d": "would", 
                 "'ll": "will", "'ino": "into", "N'T": "NOT", "'have": 'have', }
 
-        with open('dict_tags_parser_tagger.json', 'r') as fp:
+        with open('dict_tags_parser_tagger_'+lang+'.json', 'r') as fp:
             self.dict_tags_parser_tagger = json.load(fp)
 
 
@@ -162,7 +162,7 @@ class BertTokenizerA(object):
       compare_tokens = []
       k = 0
       l = 0
-      
+
       while k < len(naive_split):
         
         if naive_split[k] == bert_split[l] or bert_split[l] == "[UNK]":
@@ -175,6 +175,7 @@ class BertTokenizerA(object):
             ngram = bert_split[l:l+j+1]
             word = "".join(ngram)
             word = word.replace("##", "")
+
             if naive_split[k] == word:
               compare_tokens.append([l, l+j])
               k += 1

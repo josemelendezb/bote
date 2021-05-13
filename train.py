@@ -24,7 +24,7 @@ class Instructor:
         
         if opt.model == 'bote':
             absa_data_reader = ABSADataReaderV3(data_dir=opt.data_dir)
-            tokenizer = BertTokenizerA(opt.bert_model, opt.case, opt.spacy_lang)
+            tokenizer = BertTokenizerA(opt.bert_model, opt.case, opt.spacy_lang, opt.lang)
             embedding_matrix = []
             self.train_data_loader = BucketIteratorBert(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
             self.dev_data_loader = BucketIteratorBert(data=absa_data_reader.get_dev(tokenizer), batch_size=opt.batch_size, shuffle=False)
@@ -264,8 +264,6 @@ class Instructor:
             self._reset_params()
             _params = filter(lambda p: p.requires_grad, self.model.parameters())
             optimizer = torch.optim.Adam(_params, lr=self.opt.learning_rate, weight_decay=self.opt.l2reg)
-            ##elimintar
-            #self.model.triplet_biaffine.weights_init()
 
             # Allow bert update its weights during training
             if opt.update_bert:

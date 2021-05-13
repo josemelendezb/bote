@@ -46,10 +46,10 @@ class CoupledAttn(nn.Module):
         fp = torch.tanh(torch.cat([h_G_up, h_D_ua], -1))
 
         # GRU_fa
-        ra, (_, _) = self.gru_ra(fa, h_len)
+        ra, (_, _) = self.gru_ra(fa, h_len.cpu())
 
         # GRU_fp
-        rp, (_, _) = self.gru_rp(fp, h_len)
+        rp, (_, _) = self.gru_rp(fp, h_len.cpu())
 
         # scalar score
         ea = self.va(ra) # [batch_size, seq_len, 1]
@@ -129,6 +129,7 @@ class CMLA(nn.Module):
     def forward(self, inputs):
         text_indices, text_mask = inputs
         text_len = torch.sum(text_mask, dim=-1)
+        text_len = text_len.cpu()
 
         embed = self.embed(text_indices)
 
@@ -166,6 +167,7 @@ class CMLA(nn.Module):
     def inference(self, inputs):
         text_indices, text_mask = inputs
         text_len = torch.sum(text_mask, dim=-1)
+        text_len = text_len.cpu()
 
         embed = self.embed(text_indices)
 

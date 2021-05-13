@@ -85,6 +85,6 @@ if __name__ == '__main__':
 
     suffix = ""
 
-    process("./datasets/ReLi/train_triplets.txt", opt, suffix)
-    process("./datasets/ReLi/dev_triplets.txt", opt, suffix)
-    process("./datasets/ReLi/test_triplets.txt", opt, suffix)
+    process("./datasets/ReHol/train_triplets.txt", opt, suffix)
+    process("./datasets/ReHol/dev_triplets.txt", opt, suffix)
+    process("./datasets/ReHol/test_triplets.txt", opt, suffix)
