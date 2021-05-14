@@ -361,18 +361,43 @@ if __name__ == '__main__':
         'xavier_normal_': torch.nn.init.xavier_normal_,
         'orthogonal_': torch.nn.init.orthogonal_,
     }
+    #data_dirs = {
+    #    'laptop14': 'datasets/lap14',
+    #    'rest14': 'datasets/rest14',
+    #    'rest15': 'datasets/rest15',
+    #    'rest16': 'datasets/rest16',
+    #    'reli': 'datasets/reli',
+    #    'rehol': 'datasets/rehol'
+    #}
+
     data_dirs = {
-        'laptop14': 'datasets/14lap',
-        'rest14': 'datasets/14rest',
-        'rest15': 'datasets/15rest',
-        'rest16': 'datasets/16rest',
-        'laptop14_bert': 'datasets_bert/14lap',
-        'rest14_bert': 'datasets_bert/14rest',
-        'rest15_bert': 'datasets_bert/15rest',
-        'rest16_bert': 'datasets_bert/16rest',
-        'reli': 'datasets/ReLi',
-        'rehol': 'datasets/ReHol'
+        'lap14_c_0': 'cross_validation/data/lap14/c_0',
+        'lap14_c_1': 'cross_validation/data/lap14/c_1',
+        'lap14_c_2': 'cross_validation/data/lap14/c_2',
+        'lap14_c_3': 'cross_validation/data/lap14/c_3',
+        'rest14_c_0': 'cross_validation/data/rest14/c_0',
+        'rest14_c_1': 'cross_validation/data/rest14/c_1',
+        'rest14_c_2': 'cross_validation/data/rest14/c_2',
+        'rest14_c_3': 'cross_validation/data/rest14/c_3',
+        'rest15_c_0': 'cross_validation/data/rest15/c_0',
+        'rest15_c_1': 'cross_validation/data/rest15/c_1',
+        'rest15_c_2': 'cross_validation/data/rest15/c_2',
+        'rest15_c_3': 'cross_validation/data/rest15/c_3',
+        'rest16_c_0': 'cross_validation/data/rest16/c_0',
+        'rest16_c_1': 'cross_validation/data/rest16/c_1',
+        'rest16_c_2': 'cross_validation/data/rest16/c_2',
+        'rest16_c_3': 'cross_validation/data/rest16/c_3',
+        'reli_c_0': 'cross_validation/data/reli/c_0',
+        'reli_c_1': 'cross_validation/data/reli/c_1',
+        'reli_c_2': 'cross_validation/data/reli/c_2',
+        'reli_c_3': 'cross_validation/data/reli/c_3',
+        'rehol_c_0': 'cross_validation/data/rehol/c_0',
+        'rehol_c_1': 'cross_validation/data/rehol/c_1',
+        'rehol_c_2': 'cross_validation/data/rehol/c_2',
+        'rehol_c_3': 'cross_validation/data/rehol/c_3',
     }
+
+
     glove_files = {
         'en': 'glove.300d.txt',
         'pt': 'glove.300d_pt.txt',

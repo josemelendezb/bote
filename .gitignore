@@ -6,3 +6,4 @@ cloudflared
 cloudflared-stable-linux-amd64.tgz
 cloudflared.log
 pruebas.py
+cross_validation/data/*
