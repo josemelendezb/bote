@@ -1,4 +1,0 @@
-repeat: 1
-test_ap_precision: 0.6663, test_ap_recall: 0.6466, test_ap_f1: 0.6563
-test_op_precision: 0.7053, test_op_recall: 0.6497, test_op_f1: 0.6763
-test_triplet_precision: 0.4624, test_triplet_recall: 0.3274, test_triplet_f1: 0.3834

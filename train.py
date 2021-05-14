@@ -48,6 +48,12 @@ class Instructor:
             'dev_triplet_precision' : [], 'dev_triplet_recall' : [], 'dev_triplet_f1' : []
         }
 
+        self.results = {
+            'aspect_extraction': {'precision': [], 'recall': [], 'f1': []},
+            'opinion_extraction': {'precision': [], 'recall': [], 'f1': []},
+            'triplet_extraction': {'precision': [], 'recall': [], 'f1': []}
+        }
+
         self._print_args()
         
 
@@ -238,10 +244,10 @@ class Instructor:
         if not os.path.exists('state_dict/'):
             os.mkdir('state_dict/')
         if self.opt.v2:
-            f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_val_v2.txt', 'w', encoding='utf-8')
+            f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_val_v2.json', 'w', encoding='utf-8')
 
         else:
-            f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_val.txt', 'w', encoding='utf-8')
+            f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_val.json', 'w', encoding='utf-8')
 
         test_ap_precision_avg = 0
         test_ap_recall_avg = 0
@@ -254,7 +260,6 @@ class Instructor:
         test_triplet_f1_avg = 0
         for i in range(repeats):
             print('repeat: {0}'.format(i+1))
-            f_out.write('repeat: {0}\n'.format(i+1))
             
             #Keep weights values
             if opt.update_bert:
@@ -276,12 +281,22 @@ class Instructor:
             test_ap_precision, test_ap_recall, test_ap_f1 = test_ap_metrics
             test_op_precision, test_op_recall, test_op_f1 = test_op_metrics
             test_triplet_precision, test_triplet_recall, test_triplet_f1 = test_triplet_metrics
+
             print('test_ap_precision: {:.4f}, test_ap_recall: {:.4f}, test_ap_f1: {:.4f}'.format(test_ap_precision, test_ap_recall, test_ap_f1))
-            f_out.write('test_ap_precision: {:.4f}, test_ap_recall: {:.4f}, test_ap_f1: {:.4f}\n'.format(test_ap_precision, test_ap_recall, test_ap_f1))
             print('test_op_precision: {:.4f}, test_op_recall: {:.4f}, test_op_f1: {:.4f}'.format(test_op_precision, test_op_recall, test_op_f1))
-            f_out.write('test_op_precision: {:.4f}, test_op_recall: {:.4f}, test_op_f1: {:.4f}\n'.format(test_op_precision, test_op_recall, test_op_f1))
             print('test_triplet_precision: {:.4f}, test_triplet_recall: {:.4f}, test_triplet_f1: {:.4f}'.format(test_triplet_precision, test_triplet_recall, test_triplet_f1))
-            f_out.write('test_triplet_precision: {:.4f}, test_triplet_recall: {:.4f}, test_triplet_f1: {:.4f}\n'.format(test_triplet_precision, test_triplet_recall, test_triplet_f1))
+            
+            # Save result metrics in dict
+            self.results['aspect_extraction']['precision'].append(test_ap_precision)
+            self.results['aspect_extraction']['recall'].append(test_ap_recall)
+            self.results['aspect_extraction']['f1'].append(test_ap_f1)
+            self.results['opinion_extraction']['precision'].append(test_op_precision)
+            self.results['opinion_extraction']['recall'].append(test_op_recall)
+            self.results['opinion_extraction']['f1'].append(test_op_f1)
+            self.results['triplet_extraction']['precision'].append(test_triplet_precision)
+            self.results['triplet_extraction']['recall'].append(test_triplet_recall)
+            self.results['triplet_extraction']['f1'].append(test_triplet_f1)
+
             test_ap_precision_avg += test_ap_precision
             test_ap_recall_avg += test_ap_recall
             test_ap_f1_avg += test_ap_f1
@@ -302,6 +317,7 @@ class Instructor:
         print("test_triplet_recall_avg:", test_triplet_recall_avg / repeats)
         print("test_triplet_f1_avg:", test_triplet_f1_avg / repeats)
 
+        json.dump(self.results, f_out)
         f_out.close()
 
         if self.opt.save_history_metrics:
