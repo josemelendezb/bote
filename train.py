@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from bucket_iterator import BucketIterator, BucketIteratorBert
-from data_utils import ABSADataReader, ABSADataReaderV2, ABSADataReaderV3, BertTokenizerA, build_tokenizer, build_embedding_matrix
+from data_utils import ABSADataReader, ABSADataReaderBERT, BertTokenizer, build_tokenizer, build_embedding_matrix
 from models import CMLA, HAST, OTE, BOTE
 
 
@@ -17,19 +17,15 @@ class Instructor:
     def __init__(self, opt):
         self.opt = opt
         
-        if opt.v2:
-            absa_data_reader = ABSADataReaderV2(data_dir=opt.data_dir)
-        else:
-            absa_data_reader = ABSADataReader(data_dir=opt.data_dir)
-        
         if opt.model == 'bote':
-            absa_data_reader = ABSADataReaderV3(data_dir=opt.data_dir)
-            tokenizer = BertTokenizerA(opt.bert_model, opt.case, opt.spacy_lang, opt.lang)
+            absa_data_reader = ABSADataReaderBERT(data_dir=opt.data_dir)
+            tokenizer = BertTokenizer(opt.bert_model, opt.case, opt.spacy_lang, opt.lang)
             embedding_matrix = []
             self.train_data_loader = BucketIteratorBert(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
             self.dev_data_loader = BucketIteratorBert(data=absa_data_reader.get_dev(tokenizer), batch_size=opt.batch_size, shuffle=False)
             self.test_data_loader = BucketIteratorBert(data=absa_data_reader.get_test(tokenizer), batch_size=opt.batch_size, shuffle=False)
         else:
+            absa_data_reader = ABSADataReader(data_dir=opt.data_dir)
             tokenizer = build_tokenizer(data_dir=opt.data_dir)
             embedding_matrix = build_embedding_matrix(opt.data_dir, tokenizer.word2idx, opt.embed_dim, opt.dataset, opt.glove_fname)
             self.train_data_loader = BucketIterator(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
@@ -243,11 +239,8 @@ class Instructor:
 
         if not os.path.exists('state_dict/'):
             os.mkdir('state_dict/')
-        if self.opt.v2:
-            f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_val_v2.json', 'w', encoding='utf-8')
 
-        else:
-            f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_val.json', 'w', encoding='utf-8')
+        f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_test.json', 'w', encoding='utf-8')
 
         test_ap_precision_avg = 0
         test_ap_recall_avg = 0
@@ -330,7 +323,6 @@ class Instructor:
 if __name__ == '__main__':
     # Hyper Parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--v2', action='store_true')
     parser.add_argument('--model', default='ote', type=str)
     parser.add_argument('--case', type=str)
     parser.add_argument('--dataset', default='laptop14', type=str, help='laptop14, rest14, rest15, rest16')

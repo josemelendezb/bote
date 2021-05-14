@@ -125,7 +125,7 @@ def build_tokenizer(data_dir):
     return tokenizer
 
    
-class BertTokenizerA(object):
+class BertTokenizer(object):
     def __init__(self, bert_model = 'bert-base-uncased', case = 'uncased', spacy_lang = "en_core_web_md", lang = "en"):
         self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
         self.case = case
@@ -234,70 +234,6 @@ class ABSADataReader(object):
     def _create_dataset(self, set_type, tokenizer):
         all_data = []
 
-        filename = os.path.join(self.data_dir, '%s.pair' % set_type)
-        fp = open(filename, 'r', encoding='utf-8')
-        lines = fp.readlines()
-        fp.close()
-
-        for i in range(0, len(lines), 2):
-            text = lines[i].strip()
-            pairs = lines[i+1].strip().split(';')
-            
-            text_indices = tokenizer.text_to_sequence(text)
-            seq_len = len(text_indices)
-            ap_tags = ['O'] * seq_len
-            op_tags = ['O'] * seq_len
-            ap_op_tags = ['O'] * seq_len
-
-            triplet_indices = np.zeros((seq_len, seq_len), dtype=np.int64)
-            ap_spans = []
-            op_spans = []
-            triplets = []
-            for pair in pairs:
-                pair = eval(pair)
-                ap_beg, ap_end = pair[0]
-                op_beg, op_end = pair[1]
-                polarity_str = pair[2]
-                ap_tags[ap_beg:ap_end+1] = ['T'] * (ap_end-ap_beg+1)
-                op_tags[op_beg:op_end+1] = ['T'] * (op_end-op_beg+1)
-                ap_op_tags[ap_beg:ap_end+1] = ['T-AP'] * (ap_end-ap_beg+1)
-                ap_op_tags[op_beg:op_end+1] = ['T-OP'] * (op_end-op_beg+1)
-                polarity = self.polarity_map[polarity_str]
-                triplet_indices[ap_end, op_end] = polarity
-                if (ap_beg, ap_end) not in ap_spans:
-                    ap_spans.append((ap_beg, ap_end))
-                if (op_beg, op_end) not in op_spans:
-                    op_spans.append((op_beg, op_end))
-                triplets.append((ap_beg, ap_end, op_beg, op_end, polarity))
-
-            # convert from ot to bio
-            ap_tags = to2bio(ap_tags)
-            op_tags = to2bio(op_tags)
-            ap_op_tags = to2bio(ap_op_tags)
-
-            ap_indices = [self.tag_map[tag] for tag in ap_tags]
-            op_indices = [self.tag_map[tag] for tag in op_tags]
-
-            data = {
-                'text_indices': text_indices,
-                'ap_indices': ap_indices,
-                'op_indices': op_indices,
-                'triplet_indices': triplet_indices,
-                'ap_spans': ap_spans,
-                'op_spans': op_spans,
-                'triplets': triplets,
-            }
-            all_data.append(data)
-        
-        return all_data
-
-class ABSADataReaderV2(ABSADataReader):
-    def __init__(self, data_dir):
-        super(ABSADataReaderV2, self).__init__(data_dir)
-
-    def _create_dataset(self, set_type, tokenizer):
-        all_data = []
-
         filename = os.path.join(self.data_dir, '%s_triplets.txt' % set_type)
         fp = open(filename, 'r', encoding='utf-8')
         lines = fp.readlines()
@@ -354,9 +290,9 @@ class ABSADataReaderV2(ABSADataReader):
         return all_data
         
 
-class ABSADataReaderV3(ABSADataReader):
+class ABSADataReaderBERT(ABSADataReader):
     def __init__(self, data_dir):
-        super(ABSADataReaderV3, self).__init__(data_dir)
+        super(ABSADataReaderBERT, self).__init__(data_dir)
 
     def _create_dataset(self, set_type, tokenizer):
         all_data = []
