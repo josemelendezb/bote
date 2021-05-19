@@ -308,7 +308,6 @@ class ABSADataReaderBERT(ABSADataReader):
 
         for i in range(len(lines)):
             text, pairs = lines[i].strip().split('####')
-
             text_indices, text_indices_bert, position_bert_in_naive = tokenizer.text_to_sequence(text)
             postag_indices = tokenizer.text_to_sequence_postags(text)
             seq_len = len(text_indices)

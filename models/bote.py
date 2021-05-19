@@ -76,7 +76,6 @@ class BOTE(nn.Module):
         self.position_embedding = self.bert.embeddings.position_embeddings.weight
         self.bert_dropout = nn.Dropout(0.3)
         self.gat1 = GraphAttentionLayer(opt.embed_dim, opt.embed_dim)
-        self.gat2 = GAT(in_dim=opt.embed_dim, hidden_dim=opt.embed_dim, out_dim=opt.embed_dim, num_heads=1)
 
         self.gate_map = nn.Linear(opt.embed_dim * 2, opt.embed_dim)
         self.reduc = DynamicRNN(opt.embed_dim+50, reduc_dim, batch_first=True, bidirectional=True, rnn_type='GRU')
@@ -175,30 +174,7 @@ class BOTE(nn.Module):
             bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert).last_hidden_state
             
             return bert_layer[0, -add_n_pads:]
-        
-    def generate_dgl_graph(self, batch_adj_matrix):
 
-        batch_graph = []
-        for adj_matrix in batch_adj_matrix:
-            u = torch.tensor([]).to(self.opt.device)
-            v = torch.tensor([]).to(self.opt.device)
-            for i, head in enumerate(adj_matrix):
-                for j, child in enumerate(head):
-                    if child == 1 or i == j:
-                        ui = torch.tensor([i]).to(self.opt.device)
-                        vj = torch.tensor([j]).to(self.opt.device)
-
-                        u = torch.cat((u, ui), dim = 0)
-                        v = torch.cat((v, vj), dim = 0)
-
-            u = u.int()
-            v = v.int()
-
-            g = dgl.graph((u, v)).to(self.opt.device)
-            batch_graph.append(g)
-
-        batch_graph = dgl.batch(batch_graph)
-        return batch_graph
 
     def forward(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices, adj = inputs
