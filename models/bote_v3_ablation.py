@@ -74,11 +74,12 @@ class BOTE_V3_ABLATION(nn.Module):
         
         self.bert = AutoModel.from_pretrained(opt.bert_model)
         self.bert_dropout = nn.Dropout(0.3)
+        self.reduc = DynamicRNN(opt.embed_dim, reduc_dim, batch_first=True, bidirectional=True, rnn_type='GRU')
 
-        self.ap_fc = nn.Linear(opt.embed_dim+50, 150)
-        self.op_fc = nn.Linear(opt.embed_dim+50, 150)
-        self.ap_fc2 = nn.Linear(opt.embed_dim+50, 150)
-        self.op_fc2 = nn.Linear(opt.embed_dim+50, 150)
+        self.ap_fc = nn.Linear(2*reduc_dim, 150)
+        self.op_fc = nn.Linear(2*reduc_dim, 150)
+        self.ap_fc2 = nn.Linear(2*reduc_dim, 150)
+        self.op_fc2 = nn.Linear(2*reduc_dim, 150)
 
         self.triplet_biaffine = Biaffine(opt, 150, 150, opt.polarities_dim, bias=(True, False))
 
@@ -92,9 +93,6 @@ class BOTE_V3_ABLATION(nn.Module):
         
         with open('dict_tags_parser_tagger_'+self.opt.lang+'.json', 'r') as fp:
             self.dict_tags_parser_tagger = json.load(fp)
-        
-
-        self.embed_POS = nn.Embedding(len(self.dict_tags_parser_tagger),50, padding_idx = 0)
         
 
     def calc_loss(self, outputs, targets):
@@ -173,17 +171,18 @@ class BOTE_V3_ABLATION(nn.Module):
     def forward(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices, adj = inputs
         text_len = torch.sum(text_mask, dim=-1)
-
+        
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
 
-        embed = self.embed_POS(postag_indices)
-        bert_layer = torch.cat((embed, bert_layer), dim=2)
+        drop_bert_layer = self.bert_dropout(bert_layer)
 
-        ap_rep = F.relu(self.ap_fc(drop_bert_layer))
-        op_rep = F.relu(self.op_fc(drop_bert_layer))
-        ap_node = F.relu(self.ap_fc2(drop_bert_layer))
-        op_node = F.relu(self.op_fc2(drop_bert_layer))
+        reduc, (_, _) = self.reduc(drop_bert_layer, text_len.cpu())
+
+        ap_rep = F.relu(self.ap_fc(reduc))
+        op_rep = F.relu(self.op_fc(reduc))
+        ap_node = F.relu(self.ap_fc2(reduc))
+        op_node = F.relu(self.op_fc2(reduc))
         
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
@@ -197,16 +196,15 @@ class BOTE_V3_ABLATION(nn.Module):
     def inference(self, inputs):
         text_indices, text_mask, text_indices_bert, text_mask_bert, position_bert_in_naive, postag_indices, adj = inputs
         text_len = torch.sum(text_mask, dim=-1)
-
         bert_layer = self.bert(input_ids = text_indices_bert, attention_mask = text_mask_bert, output_hidden_states = True).hidden_states[self.opt.bert_layer_index]
         bert_layer = self.set_bert_vectors_to_naive_bert_vectors(bert_layer, position_bert_in_naive, text_indices_bert, text_mask_bert)
-        embed = self.embed_POS(postag_indices)
-        bert_layer = torch.cat((embed, bert_layer), dim=2)
 
-        ap_rep = F.relu(self.ap_fc(bert_layer))
-        op_rep = F.relu(self.op_fc(bert_layer))
-        ap_node = F.relu(self.ap_fc2(bert_layer))
-        op_node = F.relu(self.op_fc2(bert_layer))
+        reduc, (_, _) = self.reduc(bert_layer, text_len.cpu())
+
+        ap_rep = F.relu(self.ap_fc(reduc))
+        op_rep = F.relu(self.op_fc(reduc))
+        ap_node = F.relu(self.ap_fc2(reduc))
+        op_node = F.relu(self.op_fc2(reduc))
 
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)

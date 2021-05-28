@@ -2,7 +2,7 @@ import argparse
 import json
 
 
-def diplay_results_dataset(dataset, models, metrics):
+def diplay_results_dataset(dataset, models):
     aspect_extraction_all_models = {}
     opinion_extraction_all_models = {}
     triplet_extraction_all_models = {}
@@ -79,7 +79,7 @@ def diplay_results_dataset(dataset, models, metrics):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="+", default=['rest14', 'rest15', 'rest16', 'lap14', 'reli', 'rehol'])
-    parser.add_argument("--models", nargs="+", default=['bote', 'ote', 'cmla'])
+    parser.add_argument("--models", nargs="+", default=['ote', 'cmla', 'bote'])
     opt = parser.parse_args()
 
     for dataset in opt.datasets:

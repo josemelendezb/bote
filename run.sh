@@ -27,8 +27,8 @@ fi
 #for data in "${datasets[@]}"; do
 for i in 0 1 2 3; do
     dataset_="${dataset}_c_${i}"
-    #python train.py --model ote --case $cased --dataset $dataset_ --num_epoch $epochs --device cuda --patience 20 --repeats 5 --lang $lang
-    #python train.py --model cmla --case $cased --dataset $dataset_ --num_epoch $epochs --device cuda --patience 20 --repeats 5 --lang $lang
+    #python train.py --model ote --case $cased --dataset $dataset_ --num_epoch $epochs --device cuda --patience 20 --repeats 5 --lang $lang --embed_dim 300 --hidden_dim 300
+    #python train.py --model cmla --case $cased --dataset $dataset_ --num_epoch $epochs --device cuda --patience 20 --repeats 5 --lang $lang --embed_dim 300 --hidden_dim 300
     python train.py --model bote --case $cased --dataset $dataset_ --num_epoch $epochs --device cuda  --patience 20 --repeats 5 --lang $lang --bert_model $bert_model --bert_layer_index 10
 done
 #done

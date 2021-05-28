@@ -70,15 +70,17 @@ class BOTE_V2_ABLATION(nn.Module):
         self.idx2tag = idx2tag
         self.tag_dim = len(self.idx2tag)
         self.idx2polarity = idx2polarity
-        reduc_dim = 300
+        reduc_dim = 400
         
         self.bert = AutoModel.from_pretrained(opt.bert_model)
         self.bert_dropout = nn.Dropout(0.3)
 
-        self.ap_fc = nn.Linear(opt.embed_dim+50, 150)
-        self.op_fc = nn.Linear(opt.embed_dim+50, 150)
-        self.ap_fc2 = nn.Linear(opt.embed_dim+50, 150)
-        self.op_fc2 = nn.Linear(opt.embed_dim+50, 150)
+        self.reduc = nn.Linear(opt.embed_dim+50, reduc_dim)
+
+        self.ap_fc = nn.Linear(reduc_dim, 150)
+        self.op_fc = nn.Linear(reduc_dim, 150)
+        self.ap_fc2 = nn.Linear(reduc_dim, 150)
+        self.op_fc2 = nn.Linear(reduc_dim, 150)
 
         self.triplet_biaffine = Biaffine(opt, 150, 150, opt.polarities_dim, bias=(True, False))
 
@@ -179,11 +181,14 @@ class BOTE_V2_ABLATION(nn.Module):
 
         embed = self.embed_POS(postag_indices)
         bert_layer = torch.cat((embed, bert_layer), dim=2)
+        drop_bert_layer = self.bert_dropout(bert_layer)
 
-        ap_rep = F.relu(self.ap_fc(drop_bert_layer))
-        op_rep = F.relu(self.op_fc(drop_bert_layer))
-        ap_node = F.relu(self.ap_fc2(drop_bert_layer))
-        op_node = F.relu(self.op_fc2(drop_bert_layer))
+        reduc = F.relu(self.reduc(drop_bert_layer))
+
+        ap_rep = F.relu(self.ap_fc(reduc))
+        op_rep = F.relu(self.op_fc(reduc))
+        ap_node = F.relu(self.ap_fc2(reduc))
+        op_node = F.relu(self.op_fc2(reduc))
         
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)
@@ -203,10 +208,12 @@ class BOTE_V2_ABLATION(nn.Module):
         embed = self.embed_POS(postag_indices)
         bert_layer = torch.cat((embed, bert_layer), dim=2)
 
-        ap_rep = F.relu(self.ap_fc(bert_layer))
-        op_rep = F.relu(self.op_fc(bert_layer))
-        ap_node = F.relu(self.ap_fc2(bert_layer))
-        op_node = F.relu(self.op_fc2(bert_layer))
+        reduc = F.relu(self.reduc(bert_layer))
+
+        ap_rep = F.relu(self.ap_fc(reduc))
+        op_rep = F.relu(self.op_fc(reduc))
+        ap_node = F.relu(self.ap_fc2(reduc))
+        op_node = F.relu(self.op_fc2(reduc))
 
         ap_out = self.ap_tag_fc(ap_rep)
         op_out = self.op_tag_fc(op_rep)

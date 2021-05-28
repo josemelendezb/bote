@@ -321,9 +321,9 @@ class Instructor:
 if __name__ == '__main__':
     # Hyper Parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', default='ote', type=str)
+    parser.add_argument('--model', default='bote', type=str)
     parser.add_argument('--case', type=str)
-    parser.add_argument('--dataset', default='laptop14', type=str, help='laptop14, rest14, rest15, rest16')
+    parser.add_argument('--dataset', default='rehol_c_0', type=str, help='laptop14, rest14, rest15, rest16')
     parser.add_argument('--initializer', default='xavier_uniform_', type=str)
     parser.add_argument('--learning_rate', default=0.001, type=float)
     parser.add_argument('--l2reg', default=0.00001, type=float)
@@ -336,12 +336,12 @@ if __name__ == '__main__':
     parser.add_argument('--polarities_dim', default=4, type=int)
     parser.add_argument('--seed', default=776, type=int)
     parser.add_argument('--device', default=None, type=str)
-    parser.add_argument('--repeats', default=2, type=int)
-    parser.add_argument('--bert_model', default='bert-base-uncased', type=str)
+    parser.add_argument('--repeats', default=5, type=int)
+    parser.add_argument('--bert_model', default='neuralmind/bert-base-portuguese-cased', type=str)
     parser.add_argument('--bert_layer_index', default=10, type=int)
     parser.add_argument('--save_history_metrics', action='store_true')
     parser.add_argument('--update_bert', action='store_true')
-    parser.add_argument('--lang', default='en', type=str)
+    parser.add_argument('--lang', default='pt', type=str)
     opt = parser.parse_args()
 
     model_classes = {

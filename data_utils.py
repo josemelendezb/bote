@@ -105,6 +105,7 @@ class Tokenizer(object):
 def build_tokenizer(data_dir):
     if os.path.exists(os.path.join(data_dir, 'word2idx.pkl')):
         print('>>> loading {0} tokenizer...'.format(data_dir))
+        
         with open(os.path.join(data_dir, 'word2idx.pkl'), 'rb') as f:
                 word2idx = pickle.load(f)
                 tokenizer = Tokenizer(word2idx=word2idx)
