@@ -9,27 +9,23 @@ import torch
 import torch.nn as nn
 import numpy as np
 from bucket_iterator import BucketIterator, BucketIteratorBert
-from data_utils import ABSADataReader, ABSADataReaderV2, ABSADataReaderV3, BertTokenizerA, build_tokenizer, build_embedding_matrix
-from models import CMLA, HAST, OTE, BOTE
-
+from data_utils import ABSADataReader, ABSADataReaderBERT, BertTokenizer, build_tokenizer, build_embedding_matrix
+from models import CMLA, OTE, BOTE
+from models import BOTE_V0_ABLATION, BOTE_V1_ABLATION, BOTE_V2_ABLATION, BOTE_V3_ABLATION
 
 class Instructor:
     def __init__(self, opt):
         self.opt = opt
         
-        if opt.v2:
-            absa_data_reader = ABSADataReaderV2(data_dir=opt.data_dir)
-        else:
-            absa_data_reader = ABSADataReader(data_dir=opt.data_dir)
-        
-        if opt.model == 'bote':
-            absa_data_reader = ABSADataReaderV3(data_dir=opt.data_dir)
-            tokenizer = BertTokenizerA(opt.bert_model, opt.case)
+        if opt.model in ['bote', 'bote_v0_ablation', 'bote_v1_ablation', 'bote_v2_ablation', 'bote_v3_ablation']:
+            absa_data_reader = ABSADataReaderBERT(data_dir=opt.data_dir)
+            tokenizer = BertTokenizer(opt.bert_model, opt.case, opt.spacy_lang, opt.lang)
             embedding_matrix = []
             self.train_data_loader = BucketIteratorBert(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
             self.dev_data_loader = BucketIteratorBert(data=absa_data_reader.get_dev(tokenizer), batch_size=opt.batch_size, shuffle=False)
             self.test_data_loader = BucketIteratorBert(data=absa_data_reader.get_test(tokenizer), batch_size=opt.batch_size, shuffle=False)
         else:
+            absa_data_reader = ABSADataReader(data_dir=opt.data_dir)
             tokenizer = build_tokenizer(data_dir=opt.data_dir)
             embedding_matrix = build_embedding_matrix(opt.data_dir, tokenizer.word2idx, opt.embed_dim, opt.dataset, opt.glove_fname)
             self.train_data_loader = BucketIterator(data=absa_data_reader.get_train(tokenizer), batch_size=opt.batch_size, shuffle=True)
@@ -46,6 +42,12 @@ class Instructor:
             'dev_ap_precision' : [], 'dev_ap_recall' : [], 'dev_ap_f1' : [],
             'dev_op_precision' : [], 'dev_op_recall' : [], 'dev_op_f1' : [],
             'dev_triplet_precision' : [], 'dev_triplet_recall' : [], 'dev_triplet_f1' : []
+        }
+
+        self.results = {
+            'aspect_extraction': {'precision': [], 'recall': [], 'f1': []},
+            'opinion_extraction': {'precision': [], 'recall': [], 'f1': []},
+            'triplet_extraction': {'precision': [], 'recall': [], 'f1': []}
         }
 
         self._print_args()
@@ -237,11 +239,8 @@ class Instructor:
 
         if not os.path.exists('state_dict/'):
             os.mkdir('state_dict/')
-        if self.opt.v2:
-            f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_val_v2.txt', 'w', encoding='utf-8')
 
-        else:
-            f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_val.txt', 'w', encoding='utf-8')
+        f_out = open('log/'+self.opt.model+'_'+self.opt.dataset+'_test.json', 'w', encoding='utf-8')
 
         test_ap_precision_avg = 0
         test_ap_recall_avg = 0
@@ -254,33 +253,43 @@ class Instructor:
         test_triplet_f1_avg = 0
         for i in range(repeats):
             print('repeat: {0}'.format(i+1))
-            f_out.write('repeat: {0}\n'.format(i+1))
             
-            ##elimintar
-            #for param in self.model.bert.base_model.parameters():
-            #    param.requires_grad = False
-            ##
+            #Keep weights values
+            if opt.update_bert:
+                for param in self.model.bert.base_model.parameters():
+                    param.requires_grad = False
             
             self._reset_params()
             _params = filter(lambda p: p.requires_grad, self.model.parameters())
             optimizer = torch.optim.Adam(_params, lr=self.opt.learning_rate, weight_decay=self.opt.l2reg)
-            ##elimintar
-            #self.model.triplet_biaffine.weights_init()
-            #for param in self.model.bert.base_model.parameters():
-            #    param.requires_grad = True
-            ##
+
+            # Allow bert update its weights during training
+            if opt.update_bert:
+                for param in self.model.bert.base_model.parameters():
+                    param.requires_grad = True
+
             best_state_dict_path = self._train(optimizer)
             self.model.load_state_dict(torch.load(best_state_dict_path))
             test_ap_metrics, test_op_metrics, test_triplet_metrics = self._evaluate(self.test_data_loader)
             test_ap_precision, test_ap_recall, test_ap_f1 = test_ap_metrics
             test_op_precision, test_op_recall, test_op_f1 = test_op_metrics
             test_triplet_precision, test_triplet_recall, test_triplet_f1 = test_triplet_metrics
+
             print('test_ap_precision: {:.4f}, test_ap_recall: {:.4f}, test_ap_f1: {:.4f}'.format(test_ap_precision, test_ap_recall, test_ap_f1))
-            f_out.write('test_ap_precision: {:.4f}, test_ap_recall: {:.4f}, test_ap_f1: {:.4f}\n'.format(test_ap_precision, test_ap_recall, test_ap_f1))
             print('test_op_precision: {:.4f}, test_op_recall: {:.4f}, test_op_f1: {:.4f}'.format(test_op_precision, test_op_recall, test_op_f1))
-            f_out.write('test_op_precision: {:.4f}, test_op_recall: {:.4f}, test_op_f1: {:.4f}\n'.format(test_op_precision, test_op_recall, test_op_f1))
             print('test_triplet_precision: {:.4f}, test_triplet_recall: {:.4f}, test_triplet_f1: {:.4f}'.format(test_triplet_precision, test_triplet_recall, test_triplet_f1))
-            f_out.write('test_triplet_precision: {:.4f}, test_triplet_recall: {:.4f}, test_triplet_f1: {:.4f}\n'.format(test_triplet_precision, test_triplet_recall, test_triplet_f1))
+            
+            # Save result metrics in dict
+            self.results['aspect_extraction']['precision'].append(test_ap_precision)
+            self.results['aspect_extraction']['recall'].append(test_ap_recall)
+            self.results['aspect_extraction']['f1'].append(test_ap_f1)
+            self.results['opinion_extraction']['precision'].append(test_op_precision)
+            self.results['opinion_extraction']['recall'].append(test_op_recall)
+            self.results['opinion_extraction']['f1'].append(test_op_f1)
+            self.results['triplet_extraction']['precision'].append(test_triplet_precision)
+            self.results['triplet_extraction']['recall'].append(test_triplet_recall)
+            self.results['triplet_extraction']['f1'].append(test_triplet_f1)
+
             test_ap_precision_avg += test_ap_precision
             test_ap_recall_avg += test_ap_recall
             test_ap_f1_avg += test_ap_f1
@@ -301,6 +310,7 @@ class Instructor:
         print("test_triplet_recall_avg:", test_triplet_recall_avg / repeats)
         print("test_triplet_f1_avg:", test_triplet_f1_avg / repeats)
 
+        json.dump(self.results, f_out)
         f_out.close()
 
         if self.opt.save_history_metrics:
@@ -308,15 +318,12 @@ class Instructor:
                 json.dump(self.history_metrics, fp, indent=4)
             
 
-
-
 if __name__ == '__main__':
     # Hyper Parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--v2', action='store_true')
-    parser.add_argument('--model', default='ote', type=str)
+    parser.add_argument('--model', default='bote', type=str)
     parser.add_argument('--case', type=str)
-    parser.add_argument('--dataset', default='laptop14', type=str, help='laptop14, rest14, rest15, rest16')
+    parser.add_argument('--dataset', default='rehol_c_0', type=str, help='laptop14, rest14, rest15, rest16')
     parser.add_argument('--initializer', default='xavier_uniform_', type=str)
     parser.add_argument('--learning_rate', default=0.001, type=float)
     parser.add_argument('--l2reg', default=0.00001, type=float)
@@ -329,53 +336,86 @@ if __name__ == '__main__':
     parser.add_argument('--polarities_dim', default=4, type=int)
     parser.add_argument('--seed', default=776, type=int)
     parser.add_argument('--device', default=None, type=str)
-    parser.add_argument('--repeats', default=2, type=int)
-    parser.add_argument('--bert_model', default='bert-base-uncased', type=str)
+    parser.add_argument('--repeats', default=5, type=int)
+    parser.add_argument('--bert_model', default='neuralmind/bert-base-portuguese-cased', type=str)
     parser.add_argument('--bert_layer_index', default=10, type=int)
     parser.add_argument('--save_history_metrics', action='store_true')
-    parser.add_argument('--lang', default='en', type=str)
+    parser.add_argument('--update_bert', action='store_true')
+    parser.add_argument('--lang', default='pt', type=str)
     opt = parser.parse_args()
 
     model_classes = {
         'cmla': CMLA,
-        'hast': HAST,
         'ote': OTE,
-        'bote': BOTE
+        'bote': BOTE,
+        'bote_v0_ablation': BOTE_V0_ABLATION,
+        'bote_v1_ablation': BOTE_V1_ABLATION,
+        'bote_v2_ablation': BOTE_V2_ABLATION,
+        'bote_v3_ablation': BOTE_V3_ABLATION
     }
     input_colses = {
         'cmla': ['text_indices', 'text_mask'],
-        'hast': ['text_indices', 'text_mask'],
         'ote': ['text_indices', 'text_mask'],
-        'bote': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'dependency_graph'],
+        'bote': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices', 'dependency_graph'],
+        'bote_v0_ablation': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices', 'dependency_graph'],
+        'bote_v1_ablation': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices', 'dependency_graph'],
+        'bote_v2_ablation': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices', 'dependency_graph'],
+        'bote_v3_ablation': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices', 'dependency_graph'],
     }
     target_colses = {
         'cmla': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
-        'hast': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
         'ote': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
         'bote': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
+        'bote_v0_ablation': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
+        'bote_v1_ablation': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
+        'bote_v2_ablation': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
+        'bote_v3_ablation': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
     }
     initializers = {
         'xavier_uniform_': torch.nn.init.xavier_uniform_,
         'xavier_normal_': torch.nn.init.xavier_normal_,
         'orthogonal_': torch.nn.init.orthogonal_,
     }
+
     data_dirs = {
-        'laptop14': 'datasets/14lap',
-        'rest14': 'datasets/14rest',
-        'rest15': 'datasets/15rest',
-        'rest16': 'datasets/16rest',
-        'laptop14_bert': 'datasets_bert/14lap',
-        'rest14_bert': 'datasets_bert/14rest',
-        'rest15_bert': 'datasets_bert/15rest',
-        'rest16_bert': 'datasets_bert/16rest',
-        'reli': 'datasets/ReLi',
-        'rehol': 'datasets/ReHol'
+        'lap14_c_0': 'cross_validation/data/lap14/c_0',
+        'lap14_c_1': 'cross_validation/data/lap14/c_1',
+        'lap14_c_2': 'cross_validation/data/lap14/c_2',
+        'lap14_c_3': 'cross_validation/data/lap14/c_3',
+        'rest14_c_0': 'cross_validation/data/rest14/c_0',
+        'rest14_c_1': 'cross_validation/data/rest14/c_1',
+        'rest14_c_2': 'cross_validation/data/rest14/c_2',
+        'rest14_c_3': 'cross_validation/data/rest14/c_3',
+        'rest15_c_0': 'cross_validation/data/rest15/c_0',
+        'rest15_c_1': 'cross_validation/data/rest15/c_1',
+        'rest15_c_2': 'cross_validation/data/rest15/c_2',
+        'rest15_c_3': 'cross_validation/data/rest15/c_3',
+        'rest16_c_0': 'cross_validation/data/rest16/c_0',
+        'rest16_c_1': 'cross_validation/data/rest16/c_1',
+        'rest16_c_2': 'cross_validation/data/rest16/c_2',
+        'rest16_c_3': 'cross_validation/data/rest16/c_3',
+        'reli_c_0': 'cross_validation/data/reli/c_0',
+        'reli_c_1': 'cross_validation/data/reli/c_1',
+        'reli_c_2': 'cross_validation/data/reli/c_2',
+        'reli_c_3': 'cross_validation/data/reli/c_3',
+        'rehol_c_0': 'cross_validation/data/rehol/c_0',
+        'rehol_c_1': 'cross_validation/data/rehol/c_1',
+        'rehol_c_2': 'cross_validation/data/rehol/c_2',
+        'rehol_c_3': 'cross_validation/data/rehol/c_3',
     }
+
     glove_files = {
-        'en': 'glove.840B.300d.txt',
-        'pt': 'glove.840B.300d_pt.txt',
-        'es': 'glove.840B.300d_es.txt',
+        'en': 'glove.300d.txt',
+        'pt': 'glove.300d_pt.txt',
+        'es': 'glove.300d_es.txt',
     }
+
+    spacy_languages = {
+        'en': 'en_core_web_md',
+        'pt': 'pt_core_news_sm',
+        'es': 'es_core_news_md',
+    }
+
     opt.model_class = model_classes[opt.model]
     opt.input_cols = input_colses[opt.model]
     opt.target_cols = target_colses[opt.model]
@@ -383,6 +423,8 @@ if __name__ == '__main__':
     opt.initializer = initializers[opt.initializer]
     opt.data_dir = data_dirs[opt.dataset]
     opt.glove_fname = glove_files[opt.lang]
+    opt.spacy_lang = spacy_languages[opt.lang]
+    
     opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') \
         if opt.device is None else torch.device(opt.device)
 

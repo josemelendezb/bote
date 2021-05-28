@@ -24,9 +24,6 @@ class WhitespaceTokenizer(object):
         spaces = [True] * len(words)
         return Doc(self.vocab, words=words, spaces=spaces)
 
-nlp = spacy.load('en_core_web_sm')
-nlp.tokenizer = WhitespaceTokenizer(nlp.vocab)
-
 def load_word_vec(path, word2idx=None, embed_dim=300):
     fin = open(path, 'r', encoding='utf-8', newline='\n', errors='ignore')
     word_vec = {}
@@ -108,6 +105,7 @@ class Tokenizer(object):
 def build_tokenizer(data_dir):
     if os.path.exists(os.path.join(data_dir, 'word2idx.pkl')):
         print('>>> loading {0} tokenizer...'.format(data_dir))
+        
         with open(os.path.join(data_dir, 'word2idx.pkl'), 'rb') as f:
                 word2idx = pickle.load(f)
                 tokenizer = Tokenizer(word2idx=word2idx)
@@ -128,15 +126,17 @@ def build_tokenizer(data_dir):
     return tokenizer
 
    
-class BertTokenizerA(object):
-    def __init__(self, bert_model = 'bert-base-uncased', case = 'uncased'):
+class BertTokenizer(object):
+    def __init__(self, bert_model = 'bert-base-uncased', case = 'uncased', spacy_lang = "en_core_web_md", lang = "en"):
         self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model)
         self.case = case
+        self.nlp = spacy.load(spacy_lang)
+        self.nlp.tokenizer = WhitespaceTokenizer(self.nlp.vocab)
         self.contractions = {"'s": "is", "n't": "not", "'ve": "have",
                 "'re": "are", "'m": "am", "''": "'", "'d": "would", 
                 "'ll": "will", "'ino": "into", "N'T": "NOT", "'have": 'have', }
 
-        with open('dict_tags_parser_tagger.json', 'r') as fp:
+        with open('dict_tags_parser_tagger_'+lang+'.json', 'r') as fp:
             self.dict_tags_parser_tagger = json.load(fp)
 
 
@@ -163,10 +163,10 @@ class BertTokenizerA(object):
       compare_tokens = []
       k = 0
       l = 0
-      
+
       while k < len(naive_split):
         
-        if naive_split[k] == bert_split[l]:
+        if naive_split[k] == bert_split[l] or bert_split[l] == "[UNK]":
           compare_tokens.append([l, l])
           k += 1
           l += 1
@@ -176,6 +176,7 @@ class BertTokenizerA(object):
             ngram = bert_split[l:l+j+1]
             word = "".join(ngram)
             word = word.replace("##", "")
+
             if naive_split[k] == word:
               compare_tokens.append([l, l+j])
               k += 1
@@ -194,28 +195,18 @@ class BertTokenizerA(object):
         text = re.sub("Ã¢â‚¬â„¢", "'", text)
         text = re.sub("``", "\"", text)
         if self.case == 'uncased': text = text.lower()
-        doc = nlp(text)
-        #indexes_postags = [self.pos_tag[token.pos_] for token in doc]
+        doc = self.nlp(text)
         
         indexes_postags = []
-        #for token in doc:
-        #    if token.tag_ in self.d_tag:
-        #        indexes_postags.append(self.d_tag[token.tag_])
-        #    elif token.pos_ in self.d_pos:
-        #        indexes_postags.append(self.d_pos[token.pos_])
-        #    else:
-        #        raise Exception("tag not found")
 
         for token in doc:
-            cat = token.tag_ + "__" + token.dep_
-            if cat in self.dict_tags_parser_tagger:
-                indexes_postags.append(self.dict_tags_parser_tagger[cat])
+            if token.tag_ in self.dict_tags_parser_tagger:
+                indexes_postags.append(self.dict_tags_parser_tagger[token.tag_])
             else:
-                print(cat)
+                print(token.tag_)
                 indexes_postags.append(1)
 
                 #raise Exception("tag not found")
-
         return indexes_postags
 
 class ABSADataReader(object):
@@ -240,70 +231,6 @@ class ABSADataReader(object):
         tag_map = {tag:i for i, tag in enumerate(tag_list)}
         reverse_tag_map = {i:tag for i, tag in enumerate(tag_list)}
         return tag_map, reverse_tag_map
-
-    def _create_dataset(self, set_type, tokenizer):
-        all_data = []
-
-        filename = os.path.join(self.data_dir, '%s.pair' % set_type)
-        fp = open(filename, 'r', encoding='utf-8')
-        lines = fp.readlines()
-        fp.close()
-
-        for i in range(0, len(lines), 2):
-            text = lines[i].strip()
-            pairs = lines[i+1].strip().split(';')
-            
-            text_indices = tokenizer.text_to_sequence(text)
-            seq_len = len(text_indices)
-            ap_tags = ['O'] * seq_len
-            op_tags = ['O'] * seq_len
-            ap_op_tags = ['O'] * seq_len
-
-            triplet_indices = np.zeros((seq_len, seq_len), dtype=np.int64)
-            ap_spans = []
-            op_spans = []
-            triplets = []
-            for pair in pairs:
-                pair = eval(pair)
-                ap_beg, ap_end = pair[0]
-                op_beg, op_end = pair[1]
-                polarity_str = pair[2]
-                ap_tags[ap_beg:ap_end+1] = ['T'] * (ap_end-ap_beg+1)
-                op_tags[op_beg:op_end+1] = ['T'] * (op_end-op_beg+1)
-                ap_op_tags[ap_beg:ap_end+1] = ['T-AP'] * (ap_end-ap_beg+1)
-                ap_op_tags[op_beg:op_end+1] = ['T-OP'] * (op_end-op_beg+1)
-                polarity = self.polarity_map[polarity_str]
-                triplet_indices[ap_end, op_end] = polarity
-                if (ap_beg, ap_end) not in ap_spans:
-                    ap_spans.append((ap_beg, ap_end))
-                if (op_beg, op_end) not in op_spans:
-                    op_spans.append((op_beg, op_end))
-                triplets.append((ap_beg, ap_end, op_beg, op_end, polarity))
-
-            # convert from ot to bio
-            ap_tags = to2bio(ap_tags)
-            op_tags = to2bio(op_tags)
-            ap_op_tags = to2bio(ap_op_tags)
-
-            ap_indices = [self.tag_map[tag] for tag in ap_tags]
-            op_indices = [self.tag_map[tag] for tag in op_tags]
-
-            data = {
-                'text_indices': text_indices,
-                'ap_indices': ap_indices,
-                'op_indices': op_indices,
-                'triplet_indices': triplet_indices,
-                'ap_spans': ap_spans,
-                'op_spans': op_spans,
-                'triplets': triplets,
-            }
-            all_data.append(data)
-        
-        return all_data
-
-class ABSADataReaderV2(ABSADataReader):
-    def __init__(self, data_dir):
-        super(ABSADataReaderV2, self).__init__(data_dir)
 
     def _create_dataset(self, set_type, tokenizer):
         all_data = []
@@ -364,9 +291,9 @@ class ABSADataReaderV2(ABSADataReader):
         return all_data
         
 
-class ABSADataReaderV3(ABSADataReader):
+class ABSADataReaderBERT(ABSADataReader):
     def __init__(self, data_dir):
-        super(ABSADataReaderV3, self).__init__(data_dir)
+        super(ABSADataReaderBERT, self).__init__(data_dir)
 
     def _create_dataset(self, set_type, tokenizer):
         all_data = []
@@ -376,15 +303,14 @@ class ABSADataReaderV3(ABSADataReader):
         lines = fp.readlines()
         fp.close()
 
-        fp = open(filename + '_sent.graph', 'rb')
+        fp = open(filename + '.graph', 'rb')
         idx2gragh = pickle.load(fp)
         fp.close()
 
         for i in range(len(lines)):
             text, pairs = lines[i].strip().split('####')
-
             text_indices, text_indices_bert, position_bert_in_naive = tokenizer.text_to_sequence(text)
-            #postag_indices = tokenizer.text_to_sequence_postags(text)
+            postag_indices = tokenizer.text_to_sequence_postags(text)
             seq_len = len(text_indices)
             ap_tags = ['O'] * seq_len
             op_tags = ['O'] * seq_len
@@ -431,7 +357,7 @@ class ABSADataReaderV3(ABSADataReader):
                 'triplets': triplets,
                 'text_indices_bert': text_indices_bert,
                 'position_bert_in_naive': position_bert_in_naive,
-                #'postag_indices': postag_indices,
+                'postag_indices': postag_indices,
                 'dependency_graph': dependency_graph,
             }
             all_data.append(data)

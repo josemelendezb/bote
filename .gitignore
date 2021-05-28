@@ -3,6 +3,9 @@ glove/*
 install.sh
 install.sh.1
 cloudflared
+large_sentences.py
+infer_ote.py
+large_sentences.txt
 cloudflared-stable-linux-amd64.tgz
 cloudflared.log
-pruebas.py
+cross_validation/data/*

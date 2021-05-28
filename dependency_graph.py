@@ -17,9 +17,6 @@ class WhitespaceTokenizer(object):
         spaces = [True] * len(words)
         return Doc(self.vocab, words=words, spaces=spaces)
 
-nlp = spacy.load('en_core_web_sm')
-nlp.tokenizer = WhitespaceTokenizer(nlp.vocab)
-
 def normalize(mx):
     """Row-normalize sparse matrix"""
     rowsum = np.array(mx.sum(1)) # Normalize by row
@@ -29,7 +26,7 @@ def normalize(mx):
     mx = r_mat_inv.dot(mx)
     return mx
 
-def dependency_adj_matrix(text, undirected = 0, diag_one = 0, normalized = 0):
+def dependency_adj_matrix(text, nlp, undirected = 0, diag_one = 0, normalized = 0):
     # https://spacy.io/docs/usage/processing-text
     tokens = nlp(text)
     words = text.split()
@@ -46,35 +43,27 @@ def dependency_adj_matrix(text, undirected = 0, diag_one = 0, normalized = 0):
 
     return matrix
 
-def dependency_sentiment_matrix(text, triplet):
-    # https://spacy.io/docs/usage/processing-text
-    tokens = nlp(text)
-    words = text.split()
-    matrix = np.zeros((len(words), len(words))).astype('float32')
-    assert len(words) == len(list(tokens))
-
-    triplet = eval(triplet)
-
-    for tri in triplet:
-        last_token_aspect = tri[0][-1]
-        first_token_opinion = tri[1][0]
-
-        matrix[last_token_aspect][first_token_opinion] = 1
-
-    return matrix
-
-def process(filename, opt, suffix = ""):
+def process(filename, nlp, opt):
     fin = open(filename, 'r', encoding='utf-8', newline='\n', errors='ignore')
     lines = fin.readlines()
     fin.close()
     idx2graph = {}
-    fout = open(filename+suffix+'.graph', 'wb')
+    fout = open(filename+'.graph', 'wb')
     for i in range(0, len(lines)):
         text, _, triplets = [s.lower().strip() for s in lines[i].partition("####")]
-        adj_matrix = dependency_adj_matrix(text, opt.undirected, opt.diag_one, opt.normalized)
+        adj_matrix = dependency_adj_matrix(text, nlp, opt.undirected, opt.diag_one, opt.normalized)
         idx2graph[i] = adj_matrix
     pickle.dump(idx2graph, fout)
     fout.close() 
+
+datasets = [
+    ['rest14', 'en_core_web_md'],
+    ['rest15', 'en_core_web_md'],
+    ['rest16', 'en_core_web_md'],
+    ['lap14', 'en_core_web_md'],
+    ['reli', 'pt_core_news_sm'],
+    ['rehol', 'pt_core_news_sm']
+]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -83,17 +72,15 @@ if __name__ == '__main__':
     parser.add_argument('--normalized', default=0, type=int)
     opt = parser.parse_args()
 
-    suffix = "_sent"
-
-    process("./datasets/14rest/train_triplets.txt", opt, suffix)
-    process("./datasets/14rest/dev_triplets.txt", opt, suffix)
-    process("./datasets/14rest/test_triplets.txt", opt, suffix)
-    process("./datasets/15rest/train_triplets.txt", opt, suffix)
-    process("./datasets/15rest/dev_triplets.txt", opt, suffix)
-    process("./datasets/15rest/test_triplets.txt", opt, suffix)
-    process("./datasets/16rest/train_triplets.txt", opt, suffix)
-    process("./datasets/16rest/dev_triplets.txt", opt, suffix)
-    process("./datasets/16rest/test_triplets.txt", opt, suffix)
-    process("./datasets/14lap/train_triplets.txt", opt, suffix)
-    process("./datasets/14lap/dev_triplets.txt", opt, suffix)
-    process("./datasets/14lap/test_triplets.txt", opt, suffix)
+    print("Generating adjacency matrices...")
+    lang_above = ''
+    for dataset in datasets:
+        if dataset[1] != lang_above: # Cargar solamente cuando el idioma cambie
+            print('Language '+ dataset[1] +' selected')
+            nlp = spacy.load(dataset[1])
+            nlp.tokenizer = WhitespaceTokenizer(nlp.vocab)
+        print("Generating matrix dataset "+dataset[0])
+        process('./datasets/'+dataset[0]+'/total_triplets.txt', nlp, opt)
+        lang_above = dataset[1]
+    
+    print("process finished")

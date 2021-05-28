@@ -99,16 +99,16 @@ class BucketIteratorBert(object):
         batch_text_indices_bert = []
         batch_position_bert_in_naive = []
         batch_text_mask_bert = []
-        #batch_postag_indices = []
+        batch_postag_indices = []
         batch_dependency_graph = []
         
         max_len = max([len(t['text_indices']) for t in batch_data])
         max_len_bert = max([len(t['text_indices_bert']) for t in batch_data])
         #j = 0
         for item in batch_data:
-            text_indices, ap_indices, op_indices, triplet_indices, ap_spans, op_spans, triplets, text_indices_bert, position_bert_in_naive, dependency_graph  = \
+            text_indices, ap_indices, op_indices, triplet_indices, ap_spans, op_spans, triplets, text_indices_bert, position_bert_in_naive, dependency_graph, postag_indices  = \
                 item['text_indices'], item['ap_indices'], item['op_indices'], item['triplet_indices'], item['ap_spans'], item['op_spans'], \
-                item['triplets'], item['text_indices_bert'], item['position_bert_in_naive'], item['dependency_graph']
+                item['triplets'], item['text_indices_bert'], item['position_bert_in_naive'], item['dependency_graph'], item['postag_indices']
             
             # 0-padding because 0 stands for 'O'
             text_padding = [0] * (max_len - len(text_indices))
@@ -120,7 +120,7 @@ class BucketIteratorBert(object):
             batch_ap_spans.append(ap_spans)
             batch_op_spans.append(op_spans)
             batch_triplets.append(triplets)
-            #batch_postag_indices.append(postag_indices + text_padding)
+            batch_postag_indices.append(postag_indices + text_padding)
             
             text_padding_bert = [0] * (max_len_bert - len(text_indices_bert))
             padding_position = [[-1,-1]] * (max_len - len(text_indices))
@@ -143,7 +143,7 @@ class BucketIteratorBert(object):
                 'text_indices_bert': torch.tensor(batch_text_indices_bert),
                 'text_mask_bert': torch.tensor(batch_text_mask_bert, dtype=torch.bool),
                 'position_bert_in_naive': torch.tensor(batch_position_bert_in_naive),
-                #'postag_indices': torch.tensor(batch_postag_indices),
+                'postag_indices': torch.tensor(batch_postag_indices),
                 'dependency_graph': torch.tensor(batch_dependency_graph),
             }
 
