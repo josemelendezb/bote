@@ -101,9 +101,21 @@ if __name__ == '__main__':
 
     inf = Inferer(opt)
 
-    text = 'Prós : Colchão razoável , chuveiro regular e boa limpeza geral .'
+    texts = ['Prós : Colchão razoável , chuveiro regular e boa limpeza geral .']
+    texts = []
+    targets = []
+    filename = os.path.join(opt.data_dir+'/test_triplets.txt')
+    with open(filename, 'r', encoding='utf-8') as fp:
+        for line in fp:
+            text = line.strip().split('####')[0]
+            target = line.strip().split('####')[1]
+            
+            texts.append(text)
+            targets.append(target)
 
-    for text in texts:
+
+
+    for i, (text, target) in enumerate(zip(texts, targets)):
         print(text)
         triplets = inf.evaluate(text)[2][0]
         words = text.split()
@@ -116,5 +128,11 @@ if __name__ == '__main__':
             polarity = polarity_map[p]
             print(f'{ap}, {op}, {polarity}')
         
+        print("Triplets obtidos")
+        print(triplets)
+        print("Triplets reais")
+        print(target)
         print('\n')
+
+        if i == 20: break
 

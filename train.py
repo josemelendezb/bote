@@ -11,13 +11,13 @@ import numpy as np
 from bucket_iterator import BucketIterator, BucketIteratorBert
 from data_utils import ABSADataReader, ABSADataReaderBERT, BertTokenizer, build_tokenizer, build_embedding_matrix
 from models import CMLA, OTE, BOTE
-from models import BOTE_V0_ABLATION, BOTE_V1_ABLATION, BOTE_V2_ABLATION, BOTE_V3_ABLATION
+from models import BOTE_V0_ABLATION, BOTE_V1_ABLATION, BOTE_V2_ABLATION, BOTE_V3_ABLATION, BOTE_V4
 
 class Instructor:
     def __init__(self, opt):
         self.opt = opt
         
-        if opt.model in ['bote', 'bote_v0_ablation', 'bote_v1_ablation', 'bote_v2_ablation', 'bote_v3_ablation']:
+        if opt.model in ['bote', 'bote_v0_ablation', 'bote_v1_ablation', 'bote_v2_ablation', 'bote_v3_ablation','bote_v4']:
             absa_data_reader = ABSADataReaderBERT(data_dir=opt.data_dir)
             tokenizer = BertTokenizer(opt.bert_model, opt.case, opt.spacy_lang, opt.lang)
             embedding_matrix = []
@@ -351,7 +351,8 @@ if __name__ == '__main__':
         'bote_v0_ablation': BOTE_V0_ABLATION,
         'bote_v1_ablation': BOTE_V1_ABLATION,
         'bote_v2_ablation': BOTE_V2_ABLATION,
-        'bote_v3_ablation': BOTE_V3_ABLATION
+        'bote_v3_ablation': BOTE_V3_ABLATION,
+        'bote_v4': BOTE_V4
     }
     input_colses = {
         'cmla': ['text_indices', 'text_mask'],
@@ -361,6 +362,7 @@ if __name__ == '__main__':
         'bote_v1_ablation': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices', 'dependency_graph'],
         'bote_v2_ablation': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices', 'dependency_graph'],
         'bote_v3_ablation': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices', 'dependency_graph'],
+        'bote_v4': ['text_indices', 'text_mask', 'text_indices_bert', 'text_mask_bert', 'position_bert_in_naive', 'postag_indices', 'dependency_graph'],
     }
     target_colses = {
         'cmla': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
@@ -370,6 +372,7 @@ if __name__ == '__main__':
         'bote_v1_ablation': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
         'bote_v2_ablation': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
         'bote_v3_ablation': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
+        'bote_v4': ['ap_indices', 'op_indices', 'triplet_indices', 'text_mask'],
     }
     initializers = {
         'xavier_uniform_': torch.nn.init.xavier_uniform_,
@@ -402,6 +405,10 @@ if __name__ == '__main__':
         'rehol_c_1': 'cross_validation/data/rehol/c_1',
         'rehol_c_2': 'cross_validation/data/rehol/c_2',
         'rehol_c_3': 'cross_validation/data/rehol/c_3',
+        'multidom_en': 'datasets/multidom_en',
+        'transfer_en': 'datasets/transfer_en',
+        'transfer_pt': 'datasets/transfer_pt',
+        'max_data': 'datasets/max_data',
     }
 
     glove_files = {
