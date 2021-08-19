@@ -65,6 +65,10 @@ datasets = [
     ['rehol', 'pt_core_news_sm']
 ]
 
+#datasets = [
+#    ['max_data', 'en_core_web_md']
+#]
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--undirected', default=0, type=int)
@@ -81,6 +85,12 @@ if __name__ == '__main__':
             nlp.tokenizer = WhitespaceTokenizer(nlp.vocab)
         print("Generating matrix dataset "+dataset[0])
         process('./datasets/'+dataset[0]+'/total_triplets.txt', nlp, opt)
+
+        #process('./datasets/'+dataset[0]+'/train_triplets.txt', nlp, opt)
+        #process('./datasets/'+dataset[0]+'/dev_triplets.txt', nlp, opt)
+        #process('./datasets/'+dataset[0]+'/test_triplets.txt', nlp, opt)
+        
+
         lang_above = dataset[1]
     
     print("process finished")

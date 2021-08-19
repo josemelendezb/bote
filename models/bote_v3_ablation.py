@@ -11,8 +11,6 @@ import math
 from layers.dynamic_rnn import DynamicRNN
 from layers.graph_attention_layer import GraphAttentionLayer
 import spacy
-from layers.graph_multihead_attention_layer import GAT
-import dgl
 
 def xavier_asymmetric_uniform(tensor, gain = 1.):
 
