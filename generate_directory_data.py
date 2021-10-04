@@ -1,6 +1,6 @@
 import os
 
-datasets = ['rest14', 'rest15', 'rest16', 'lap14', 'reli', 'rehol']
+datasets = ['rest14', 'rest15', 'rest16', 'lap14', 'reli', 'rehol', 'restES']
 
 if __name__ == '__main__':
     for dataset in datasets:

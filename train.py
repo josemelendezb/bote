@@ -203,12 +203,12 @@ class Instructor:
                     t_inputs_all = t_inputs_all + t_inputs #Eliminar
         
         #eliminar
-        inputs = t_inputs_all
-        outputs = [t_ap_spans_pred_all, t_op_spans_pred_all, t_triplets_pred_all]
-        targets = [t_ap_spans_all, t_op_spans_all, t_triplets_all] 
-        torch.save(inputs, "tensor/test_inputs.pt")
-        torch.save(outputs, "tensor/test_outputs.pt")
-        torch.save(targets, "tensor/test_targets.pt")
+        #inputs = t_inputs_all
+        #outputs = [t_ap_spans_pred_all, t_op_spans_pred_all, t_triplets_pred_all]
+        #targets = [t_ap_spans_all, t_op_spans_all, t_triplets_all] 
+        #torch.save(inputs, "tensor/test_inputs.pt")
+        #torch.save(outputs, "tensor/test_outputs.pt")
+        #torch.save(targets, "tensor/test_targets.pt")
         ########
                 
         return self._metrics(t_ap_spans_all, t_ap_spans_pred_all), self._metrics(t_op_spans_all, t_op_spans_pred_all), self._metrics(t_triplets_all, t_triplets_pred_all)
@@ -405,6 +405,10 @@ if __name__ == '__main__':
         'rehol_c_1': 'cross_validation/data/rehol/c_1',
         'rehol_c_2': 'cross_validation/data/rehol/c_2',
         'rehol_c_3': 'cross_validation/data/rehol/c_3',
+        'restES_c_0': 'cross_validation/data/restES/c_0',
+        'restES_c_1': 'cross_validation/data/restES/c_1',
+        'restES_c_2': 'cross_validation/data/restES/c_2',
+        'restES_c_3': 'cross_validation/data/restES/c_3',
         'multidom_en': 'datasets/multidom_en',
         'transfer_en': 'datasets/transfer_en',
         'transfer_pt': 'datasets/transfer_pt',
@@ -414,7 +418,7 @@ if __name__ == '__main__':
     glove_files = {
         'en': 'glove.300d.txt',
         'pt': 'glove.300d_pt.txt',
-        'es': 'glove.300d_es.txt',
+        'es': 'glove.300d_es.vec',
     }
 
     spacy_languages = {
