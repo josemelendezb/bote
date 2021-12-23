@@ -9,3 +9,5 @@ large_sentences.txt
 cloudflared-stable-linux-amd64.tgz
 cloudflared.log
 cross_validation/data/*
+.clj-kondo
+.lsp

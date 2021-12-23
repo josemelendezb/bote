@@ -62,7 +62,8 @@ datasets = [
     ['rest16', 'en_core_web_md'],
     ['lap14', 'en_core_web_md'],
     ['reli', 'pt_core_news_sm'],
-    ['rehol', 'pt_core_news_sm']
+    ['rehol', 'pt_core_news_sm'],
+    ['restES', 'es_core_news_md']
 ]
 
 #datasets = [

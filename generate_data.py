@@ -5,13 +5,13 @@ import os
 import pickle
 import json
 
-datasets = ['rest14', 'rest15', 'rest16', 'lap14', 'reli', 'rehol']
+datasets = ['restES']# ['rest14', 'rest15', 'rest16', 'lap14', 'reli', 'rehol', 'restES']
 if __name__ == '__main__':
     
     for dataset in datasets:
         
         print('Loading data from '+dataset)
-        data = pd.read_csv(os.getcwd()+'/datasets/'+dataset+'/total_triplets.txt', sep="|", header=None, names = ["content"], engine='python')
+        data = pd.read_csv(os.getcwd()+'/datasets/'+dataset+'/total_triplets.txt', sep="|", header=None, names = ["content"], engine='python') # usamos este separados porque necesitamos la linea completa, no dividida
         path_matrix = open('./datasets/'+dataset+'/total_triplets.txt.graph','rb')
         matrix = pickle.load(path_matrix)
         path_matrix.close()

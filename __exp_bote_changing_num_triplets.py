@@ -43,16 +43,22 @@ def _metrics(targets, outputs):
 def load_large_sentences(dataset, cluster, _min = 22, _max = 512, num_triplets = 4):
     data = pd.read_csv('cross_validation/data/'+dataset+'/'+cluster+'/test_triplets.txt', sep='####', header=None, engine='python')
 
+    fp = open('cross_validation/data/'+dataset+'/'+cluster+'/test_triplets.txt.graph', 'rb')
+    idx2gragh = pickle.load(fp)
+    fp.close()
+
     sentences = []
     triplets = []
-    for text, triplet in zip(data[0], data[1]):
+    idx2gragh_ = []
+    for i, (text, triplet) in enumerate(zip(data[0], data[1])):
         arr = len(text.split())
         if arr >= _min and arr <= _max and len(eval(triplet)) == num_triplets:
             sentences.append(text)
             triplets.append(eval(triplet))
+            idx2gragh_.append(idx2gragh[i])
             if len(sentences) == 20: break
     
-    return sentences, triplets
+    return sentences, triplets, idx2gragh_
 
 
 class Inferer:
@@ -69,7 +75,7 @@ class Inferer:
         self.model.eval()
         torch.autograd.set_grad_enabled(False)
 
-    def evaluate(self, text):
+    def evaluate(self, text, idx2gragh):
         text_indices, text_indices_bert, position_bert_in_naive = self.tokenizer.text_to_sequence(text)
         postag_indices = self.tokenizer.text_to_sequence_postags(text)
         text_mask = [1] * len(text_indices)
@@ -81,7 +87,7 @@ class Inferer:
             'text_mask_bert': torch.tensor([text_mask_bert], dtype=torch.uint8),
             'position_bert_in_naive': torch.tensor([position_bert_in_naive]),
             'postag_indices': torch.tensor([postag_indices]),
-            'dependency_graph': torch.tensor([]),
+            'dependency_graph': torch.tensor([idx2gragh]),
         }
         with torch.no_grad():
             t_inputs = [t_sample_batched[col].to(self.opt.device) for col in self.opt.input_cols]
@@ -95,7 +101,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_triplets', default=4, type=int)
     opt = parser.parse_args()
 
-    datasets = ['rest14', 'rest16', 'rehol']
+    datasets = ['restES']#['rest14', 'rest16', 'rehol', 'restES']
 
     for num_triplets in [1,2,3,4]:
         print(80*'#')
@@ -107,20 +113,26 @@ if __name__ == '__main__':
                 opt.bert_model = 'bert-base-uncased'
                 opt.case = 'uncased'
                 opt.lang = 'en'
-            elif dataset == 'rehol':
+            elif dataset in ['rehol']:
                 opt.bert_model = 'neuralmind/bert-base-portuguese-cased'
                 opt.case = 'cased'
                 opt.lang = 'pt'
+            elif dataset in ['restES']:
+                opt.bert_model = 'dccuchile/bert-base-spanish-wwm-cased'
+                opt.case = 'cased'
+                opt.lang = 'es'
 
             data_dirs = {
                 'rest14_c_0': 'cross_validation/data/rest14/c_0',
                 'rest16_c_0': 'cross_validation/data/rest16/c_0',
                 'rehol_c_0': 'cross_validation/data/rehol/c_0',
+                'restES_c_0': 'cross_validation/data/restES/c_0',
             }
 
             spacy_languages = {
                 'en': 'en_core_web_md',
                 'pt': 'pt_core_news_sm',
+                'es': 'es_core_news_md',
             }
 
             cluster = 'c_0'
@@ -141,14 +153,14 @@ if __name__ == '__main__':
 
             inf = Inferer(opt)
 
-            texts, triplets_real = load_large_sentences(dataset, cluster, 12, 20, num_triplets)
+            texts, triplets_real, idx2gragh = load_large_sentences(dataset, cluster, 12, 30, num_triplets)
             all_outputs = []
             all_targets = []
             count_triplets = 0
 
             for i, (text, tri) in enumerate(zip(texts, triplets_real)):
                 
-                triplets = inf.evaluate(text)[2][0]
+                triplets = inf.evaluate(text, idx2gragh[i])[2][0]
                 words = text.split()
                 polarity_map = {0:'N', 1:'NEU', 2:'NEG', 3:'POS'}
                 count_triplets += len(tri)

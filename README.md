@@ -55,3 +55,21 @@ An overview of the task aspect sentiment triplet extraction (ASTE) is given belo
 ![model](/assets/subtasks.png)
 
 Given a sentence $S=\{w_{1},w_{2},w_{3},...,w_{n}\}$ consisting of $n$ words, extracting all possible triplets $T=\{(a,o,p)_{m}\}_{m=1}^{|T|}$  from $S$, where $a$, $o$ and $p$ respectively denote an n-gram aspect term, an n-gram opinion term and a sentiment polarity; $a_{m}$ and $o_{m}$ can be represented as their start and end positions ($s_{m}$, $e_{m}$) in $S$ and $p_m \in \{Positive, Negative, Neutral\}$.
+
+## Citation
+If you use the code in your paper, please cite our paper
+```bash
+@InProceedings{10.1007/978-3-030-91699-2_24,
+author="Barros, Jos{\'e} Mel{\'e}ndez
+and De Bona, Glauber",
+editor="Britto, Andr{\'e}
+and Valdivia Delgado, Karina",
+title="A Deep Learning Approach for Aspect Sentiment Triplet Extraction in Portuguese",
+booktitle="Intelligent Systems",
+year="2021",
+publisher="Springer International Publishing",
+address="Cham",
+pages="343--358",
+isbn="978-3-030-91699-2"
+}
+```
